@@ -52,6 +52,10 @@ Global search was removed from v1 (ADR-017). Phases 2–7 below are outlines; ea
 
 **Goal:** a base everything else stands on. **Exit gate:** all F0 acceptance criteria pass on Windows and macOS, V-1, V-2, V-3 and V-5 recorded.
 
+**Legend:** ✅ done · 🟡 core logic done and tested, UI/OS wiring waits on the shell · 🟡 Review = built, awaiting a check only you can do · ⬜ not started · ⏸ gated
+
+**Code so far:** `loaf-core` has 143 tests; every rule above marked done or 🟡 logic is mutation-checked where it matters.
+
 > **Open decision (V-2):** a hello-world Windows build measures about 105 MB total RAM (private bytes) against a 100 MB budget; macOS measures 47.5 MB. Features that don't touch the shell (everything in `loaf-core`) continue; shell-dependent ones wait for the decision. A second Windows figure (private working set) is being measured.
 
 ### Milestone CP1 — Foundation & verification
@@ -59,11 +63,11 @@ Global search was removed from v1 (ADR-017). Phases 2–7 below are outlines; ea
 |----|---------|-----:|--------|
 | F0-01 | Tauri + React/TS scaffold, builds on Windows & macOS | 1.5 | 🟡 Review — builds on both OSes; V-1 (oldest macOS) needs your Mac |
 | F0-02 | CI matrix + early RAM measurement (V-2) | 1.5 | 🟡 Review — CI green; **Windows over budget, decision pending** |
-| F0-13 | Error model, logging, panic hook | 1.0 | ⬜ Next |
-| F0-03 | Event bus | 1.5 | ⬜ Next |
-| F0-04 | Database, migrations, integrity check | 1.5 | ⬜ Next |
-| F0-05 | DB writer thread + read pool | 1.5 | ⬜ Next |
-| F0-06 | Clock + midnight rollover scheduler | 2.0 | ⬜ Next |
+| F0-13 | Error model, logging, panic hook | 1.0 | ✅ Done — 16 tests |
+| F0-03 | Event bus | 1.5 | ✅ Done — 11 tests |
+| F0-04 | Database, migrations, integrity check | 1.5 | ✅ Done — 24 tests |
+| F0-05 | DB writer thread + read pool | 1.5 | ✅ Done — 10 tests, mutation-checked |
+| F0-06 | Clock + midnight rollover scheduler | 2.0 | 🟡 Core done (clock, DST, scheduler); OS wake/timezone hooks wait on the shell |
 | F0-07 | Settings + typed IPC to the frontend | 1.5 | ⏸ Waits on V-2 |
 | F0-08 | Tray, single instance, close-hides, quit | 1.0 | ⏸ Waits on V-2 |
 | F0-09 | Autostart (`--hidden`) | 0.5 | ⏸ Waits on V-2 |
@@ -81,24 +85,24 @@ Global search was removed from v1 (ADR-017). Phases 2–7 below are outlines; ea
 ### Milestone CP2 — Notes core
 | ID | Feature | Days | Status |
 |----|---------|-----:|--------|
-| F1-01 | Create note + editor + autosave | 2.0 | ⬜ |
-| F1-02 | Notes list: pinned/others, cards, sort | 1.5 | ⬜ |
-| F1-03 | Edit semantics (`edited_at`, reopen) | 0.5 | ⬜ |
-| F1-04 | Delete with 5 s undo | 1.0 | ⬜ |
-| F1-05 | Pin / unpin | 0.5 | ⬜ |
-| F1-06 | Archive / restore + Archive view | 1.0 | ⬜ |
-| F1-07 | Labels: add, filter, manage | 2.0 | ⬜ |
-| F1-08 | Note colour | 0.5 | ⬜ |
+| F1-01 | Create note + editor + autosave | 2.0 | 🟡 Logic done; editor UI waits on the shell |
+| F1-02 | Notes list: pinned/others, cards, sort | 1.5 | 🟡 Logic done (list, sort, filter); UI waits |
+| F1-03 | Edit semantics (`edited_at`, reopen) | 0.5 | ✅ Logic done (`edited_at` rules) |
+| F1-04 | Delete with 5 s undo | 1.0 | 🟡 Logic done (snapshot + restore); undo toast waits |
+| F1-05 | Pin / unpin | 0.5 | 🟡 Logic done; UI waits |
+| F1-06 | Archive / restore + Archive view | 1.0 | 🟡 Logic done; Archive view waits |
+| F1-07 | Labels: add, filter, manage | 2.0 | 🟡 Logic done (Unicode-safe labels); sidebar + manager UI wait |
+| F1-08 | Note colour | 0.5 | 🟡 Logic done; picker UI waits |
 | F1-09 | Markdown edit / preview | 1.0 | ⬜ |
 | | **Milestone total** | **10.0** | |
 
 ### Milestone CP3 — Tasks & Daily Log
 | ID | Feature | Days | Status |
 |----|---------|-----:|--------|
-| F1-10 | Create task + quick add | 1.5 | ⬜ |
-| F1-11 | Task state machine + history + transition UI | 2.0 | ⬜ |
-| F1-12 | Dates, priority, project, overdue, defer | 1.5 | ⬜ |
-| F1-13 | Task detail: work updates, link note, history | 1.5 | ⬜ |
+| F1-10 | Create task + quick add | 1.5 | 🟡 Logic done (create, quick add); UI waits |
+| F1-11 | Task state machine + history + transition UI | 2.0 | 🟡 Logic done (all 25 transitions + history); transition UI waits |
+| F1-12 | Dates, priority, project, overdue, defer | 1.5 | 🟡 Logic done (dates, priority, project, overdue, defer); UI waits |
+| F1-13 | Task detail: work updates, link note, history | 1.5 | 🟡 Part done (history, note link, delete rule); work updates ⬜ |
 | F1-14 | Task views: Today / Upcoming / Pending / All / Completed | 2.0 | ⬜ |
 | F1-15 | Daily log: live, freeze at rollover, missed days | 3.0 | ⬜ |
 | F1-16 | Daily Logs view + compare + Markdown export | 1.5 | ⬜ |
