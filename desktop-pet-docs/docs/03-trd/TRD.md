@@ -1,6 +1,6 @@
 # Loaf — Technical Requirements Document (TRD)
 
-**Milestone:** D3 · **Version:** 1.2 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
+**Milestone:** D3 · **Version:** 1.3 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
 **Derives from:** PRD (D2 v1.4), ADR-001…017 (`01-build-principles/07-architecture-decisions.md`), budgets (`09-performance-budgets.md`)
 **Schema:** `05-backend/backend-schema.md` (D6 v1.2)
 **Changes:** v1.1 and v1.2 — see §12.
@@ -225,7 +225,7 @@ Frameless, transparent, `skipTaskbar`, `alwaysOnTop` per setting, `focus: false`
 
 | Requirement | Implementation |
 |-------------|----------------|
-| Zero network in Phase 0–1 | No HTTP client crate in the dependency tree; CSP `default-src 'self'`; Tauri capabilities allow only required plugins; verified by firewall test in release gate |
+| Zero network in Phase 0–1 | No HTTP client crate *that Loaf adds* (Tauri itself links `reqwest`, see D3-A3); CSP `default-src 'self'`; Tauri capabilities allow only required plugins; verified by firewall test in release gate |
 | Webview hardening | Tauri v2 capabilities per window: pet window gets only `pet_*`, `prefs_set`, `settings_get_all` |
 | Content safety | Markdown HTML disabled; no `dangerouslySetInnerHTML` except the sanitized Markdown renderer output |
 | File access | Only app-data dir + user-chosen export/import paths via OS dialog |
@@ -292,3 +292,6 @@ No architecture changed; three clarifications so the TRD can't be read against t
 ### Amendment D3-A2 (2026-10-03) — search removed, V-2 measured early
 - **Search removed (ADR-017).** Dropped: the Search service node and its read-pool edge, FTS5 from the DB label, `reindex` from the write path and the `db` module row, the whole `search` module row, the `search` and `search_rebuild` commands, the `SearchIndexRebuilt` event, "rebuild search" from import, and the V-4 task. §12's D3-A1 rows about `search`/ADR-014 are now historical. `tasks_query` replaces `search` in the read-path example.
 - **V-2 moves earlier.** A preliminary RAM measurement of a hello-world bundle runs in the F0-02 CI on both OS runners; the final measurement stays in F0-12 (see plan D7-A1, ADR-018).
+
+### Amendment D3-A3 (2026-10-03) — Tauri links an HTTP client
+F0-01's dependency audit found that `tauri` 2.12.1 depends on `reqwest` (and through it `hyper`, `tower`). [Certain] This cannot be removed, so §7's "no HTTP client crate in the dependency tree" is unsatisfiable as written. The requirement is restated as what the product actually promises: **zero outbound requests from Loaf in Phase 0–1**, verified at runtime by the firewall test, with CSP `default-src 'self'` as a second layer, and no HTTP crate *added* by Loaf. A hello-world run on Linux made 0 `AF_INET`/`AF_INET6` connections in 25 s (see `docs/learning/tauri-network-dependencies.md`); Windows and macOS are not yet measured. [Guessing] The WebView2 runtime may make its own requests that are not Loaf's, so the release firewall test must attribute traffic per process.

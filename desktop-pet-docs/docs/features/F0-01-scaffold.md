@@ -1,7 +1,7 @@
 # F0-01: Tauri v2 + React/TS/Vite scaffold, V-1
 
 ## Status
-READY
+IN REVIEW — built and verified on Linux; the Windows/macOS build (F0-02 CI) and V-1 (owner, oldest macOS) are still open
 
 ## User Story
 As the developer, I want a project that builds and launches on Windows and macOS so every later feature has somewhere to live and V-1 is answered before anything depends on it.
@@ -16,13 +16,13 @@ None (first feature).
 A single window titled "Loaf" showing a static placeholder ("Loaf — foundation build"). No design tokens, sidebar or router yet (F0-10). Wireframe: none needed.
 
 ## Acceptance Criteria
-- [ ] Cargo workspace with two members: `src-tauri/` (Tauri v2 shell) and `crates/loaf-core/` (all business logic, **no `tauri` dependency**, so it compiles and tests anywhere — ADR-002)
-- [ ] `pnpm` + Vite + React 18 + TypeScript `strict`; entry `main.html`; `pet.html` exists as an empty page for F1-22
-- [ ] `pnpm tauri dev` opens the window; `pnpm tauri build` produces a release bundle on Windows and macOS (verified in F0-02 CI)
-- [ ] Content-Security-Policy is `default-src 'self'`; Tauri capabilities grant only what the window uses
-- [ ] `cargo tree` audited for HTTP-capable crates (TRD §7, zero network in Phase 0–1); anything that arrives transitively with Tauri is listed in the PR with why it cannot be reached at runtime
+- [x] Cargo workspace with two members: `src-tauri/` (Tauri v2 shell) and `crates/loaf-core/` (all business logic, **no `tauri` dependency**, so it compiles and tests anywhere — ADR-002)
+- [x] `pnpm` + Vite + React 18 + TypeScript `strict`; entry `main.html`; `pet.html` exists as an empty page for F1-22
+- [ ] `pnpm tauri dev` opens the window; `pnpm tauri build` produces a release bundle on Windows and macOS (verified in F0-02 CI) — *Linux debug build verified: window opens and renders*
+- [x] Content-Security-Policy is `default-src 'self'`; Tauri capabilities grant only what the window uses
+- [x] `cargo tree` audited for HTTP-capable crates (TRD §7, zero network in Phase 0–1); anything that arrives transitively with Tauri is listed in the PR with why it cannot be reached at runtime. **Result:** `reqwest`/`hyper` arrive with `tauri` itself (TRD amendment D3-A3); hello-world showed 0 inet connections on Linux
 - [ ] **V-1 recorded:** the release bundle was launched on the oldest macOS the owner can access, with that version number written into `07-architecture-decisions.md` as an amendment. If it fails, the platform requirement in PRD §7 is amended to the real minimum
-- [ ] Repository ignore rules, `rust-toolchain.toml` and a pinned Node/pnpm version are committed
+- [x] Repository ignore rules, `rust-toolchain.toml` and a pinned Node/pnpm version are committed
 
 ## Events
 None emitted or listened to.

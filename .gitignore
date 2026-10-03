@@ -1,0 +1,15 @@
+# Rust
+/target/
+# Node
+node_modules/
+/dist/
+coverage/
+*.tsbuildinfo
+# Tauri generated
+/src-tauri/gen/
+# Local
+.DS_Store
+*.log
+.env*
+# Spikes are throwaway and never merged (05-learning-fundamentals.md)
+/spikes/

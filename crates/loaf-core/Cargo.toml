@@ -1,0 +1,9 @@
+[package]
+name = "loaf-core"
+description = "Loaf business logic. Must never depend on tauri (ADR-002): it has to compile and test anywhere."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
