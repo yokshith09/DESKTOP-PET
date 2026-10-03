@@ -44,7 +44,12 @@ impl Default for EventBus {
 }
 
 /// What a subscriber gets from [`Subscriber::recv`].
+///
+/// `Event` is much larger than `Resync` because events like `TaskCreated` carry a whole task. It
+/// is returned by value once per receive and consumed immediately, so boxing every event to
+/// shrink the rare small variants would only add an allocation per event.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum Recv {
     Event(Event),
     /// This subscriber missed `missed` events. Reload from the database, then carry on.
