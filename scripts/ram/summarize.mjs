@@ -27,15 +27,20 @@ export function descendants(procs, rootPid) {
 
 const asArray = (x) => (Array.isArray(x) ? x : x ? [x] : []);
 
-/** Windows: Get-Process (private bytes) joined with Win32_Process (parent ids). */
-export function parseWindows(processJson, cimJson) {
+/**
+ * Windows: Get-Process (private bytes = committed private memory, the metric 09 specifies)
+ * joined with Win32_Process (parent ids) and, optionally, the perf counter for private
+ * working set (resident private memory, closer to Task Manager). The working set is a
+ * secondary figure for context only; the gate stays on private bytes.
+ */
+export function parseWindows(processJson, cimJson, perfJson) {
   const parent = new Map(asArray(cimJson).map((c) => [c.ProcessId, c.ParentProcessId]));
-  return asArray(processJson).map((p) => ({
-    pid: p.Id,
-    ppid: parent.get(p.Id) ?? 0,
-    name: p.ProcessName,
-    bytes: p.PrivateMemorySize64,
-  }));
+  const ws = new Map(asArray(perfJson).map((c) => [c.IDProcess, c.WorkingSetPrivate]));
+  return asArray(processJson).map((p) => {
+    const proc = { pid: p.Id, ppid: parent.get(p.Id) ?? 0, name: p.ProcessName, bytes: p.PrivateMemorySize64 };
+    if (ws.has(p.Id)) proc.residentBytes = ws.get(p.Id);
+    return proc;
+  });
 }
 
 /** macOS: `ps -axo pid=,ppid=,rss=,comm=` (rss in KB; comm may contain spaces). */
@@ -78,6 +83,12 @@ export function selectMembers({ platform, procs, rootPid, baseline = new Set() }
 
 export const totalBytes = (members) => members.reduce((a, p) => a + p.bytes, 0);
 
+/** Sum of the secondary resident figure, or null if any member lacks it (never a partial sum). */
+export const totalResidentBytes = (members) =>
+  members.length > 0 && members.every((p) => typeof p.residentBytes === "number")
+    ? members.reduce((a, p) => a + p.residentBytes, 0)
+    : null;
+
 /** Bands from plan §3 CP1 decision point 1 and ADR-018. */
 export function verdict(maxBytes) {
   const mb = maxBytes / MB;
@@ -96,16 +107,19 @@ export function summarizeSamples(samples) {
   const maxBytes = Math.max(...totals);
   const meanBytes = totals.reduce((a, b) => a + b, 0) / totals.length;
   const peak = samples[totals.indexOf(maxBytes)];
-  return { maxBytes, meanBytes, peak, verdict: verdict(maxBytes) };
+  const resident = samples.map((x) => x.residentTotalBytes).filter((x) => typeof x === "number");
+  const maxResidentBytes = resident.length === samples.length ? Math.max(...resident) : null;
+  return { maxBytes, meanBytes, peak, maxResidentBytes, verdict: verdict(maxBytes) };
 }
 
 export function renderMarkdown(report) {
   const { platform, metric, settleSeconds, intervalSeconds, samples } = report;
   const s = summarizeSamples(samples);
+  const hasResident = s.maxResidentBytes !== null;
   const rows = s.peak.procs
     .slice()
     .sort((a, b) => b.bytes - a.bytes)
-    .map((p) => `| ${p.pid} | ${p.name} | ${mb1(p.bytes)} |`);
+    .map((p) => `| ${p.pid} | ${p.name} | ${mb1(p.bytes)} |${hasResident ? ` ${mb1(p.residentBytes ?? 0)} |` : ""}`);
   return [
     `### V-2 preliminary RAM — ${platform} (CI runner, hello-world bundle)`,
     "",
@@ -114,14 +128,18 @@ export function renderMarkdown(report) {
     `Sum across all Loaf processes: **max ${mb1(s.maxBytes)} MB**, mean ${mb1(s.meanBytes)} MB over ${samples.length} samples ` +
       `(${settleSeconds}s settle, every ${intervalSeconds}s). Metric: ${metric}.`,
     "",
-    "| Sample (s) | Total (MB) |",
-    "|-----------:|-----------:|",
-    ...samples.map((x) => `| ${x.t} | ${mb1(x.totalBytes)} |`),
+    hasResident
+      ? `Secondary, for context only (the gate stays on the figure above): **private working set max ${mb1(s.maxResidentBytes)} MB** — resident private memory, closer to what Task Manager shows. Private bytes counts committed pages that may never have been touched.`
+      : "",
+    "",
+    hasResident ? "| Sample (s) | Private bytes (MB) | Private working set (MB) |" : "| Sample (s) | Total (MB) |",
+    hasResident ? "|-----------:|-----------:|-----------:|" : "|-----------:|-----------:|",
+    ...samples.map((x) => `| ${x.t} | ${mb1(x.totalBytes)} |${hasResident ? ` ${mb1(x.residentTotalBytes)} |` : ""}`),
     "",
     "Processes at the peak sample:",
     "",
-    "| PID | Process | MB |",
-    "|----:|---------|---:|",
+    hasResident ? "| PID | Process | Private bytes (MB) | Private working set (MB) |" : "| PID | Process | MB |",
+    hasResident ? "|----:|---------|---:|---:|" : "|----:|---------|---:|",
     ...rows,
     "",
     "> Preliminary. A shared CI VM is not a user's machine: different webview build, no GPU, other load. " +

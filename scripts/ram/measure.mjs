@@ -13,6 +13,7 @@ import {
   selectMembers,
   summarizeSamples,
   totalBytes,
+  totalResidentBytes,
 } from "./summarize.mjs";
 
 const arg = (name, fallback) => {
@@ -41,7 +42,15 @@ function listProcesses() {
   if (platform === "win32") {
     const procs = JSON.parse(ps("Get-Process | Select-Object Id,ProcessName,PrivateMemorySize64 | ConvertTo-Json -Compress"));
     const cim = JSON.parse(ps("Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Compress"));
-    return parseWindows(procs, cim);
+    let perf = [];
+    try {
+      perf = JSON.parse(
+        ps("Get-CimInstance Win32_PerfFormattedData_PerfProc_Process | Select-Object IDProcess,WorkingSetPrivate | ConvertTo-Json -Compress"),
+      );
+    } catch {
+      /* secondary figure only: its absence must never break the gated measurement */
+    }
+    return parseWindows(procs, cim, perf);
   }
   return parsePs(run("ps", ["-axo", "pid=,ppid=,rss=,comm="]));
 }
@@ -95,7 +104,13 @@ for (let t = 0; t <= duration; t += interval) {
   samples.push({
     t,
     totalBytes: totalBytes(members),
-    procs: members.map((p) => ({ pid: p.pid, name: p.name.split(/[\\/]/).pop(), bytes: p.bytes })),
+    residentTotalBytes: totalResidentBytes(members),
+    procs: members.map((p) => ({
+      pid: p.pid,
+      name: p.name.split(/[\\/]/).pop(),
+      bytes: p.bytes,
+      ...(typeof p.residentBytes === "number" ? { residentBytes: p.residentBytes } : {}),
+    })),
   });
   console.log(`t=${t}s total=${(totalBytes(members) / 1048576).toFixed(1)} MB across ${members.length} processes`);
   if (t + interval <= duration) await sleep(interval * 1000);

@@ -9,6 +9,7 @@ import {
   selectMembers,
   summarizeSamples,
   totalBytes,
+  totalResidentBytes,
   verdict,
 } from "./summarize.mjs";
 
@@ -140,5 +141,55 @@ describe("report", () => {
     assert.match(md, /max 90\.0 MB/);
     assert.match(md, /\| 2 \| b \| 70\.0 \|/);
     assert.match(md, /Preliminary/);
+  });
+});
+
+describe("secondary resident metric (Windows private working set)", () => {
+  const perf = [
+    { IDProcess: 100, WorkingSetPrivate: 6 * MB },
+    { IDProcess: 101, WorkingSetPrivate: 12 * MB },
+    { IDProcess: 102, WorkingSetPrivate: 8 * MB },
+    { IDProcess: 103, WorkingSetPrivate: 9 * MB },
+  ];
+
+  it("attaches the resident figure per process without changing the gated private-bytes figure", () => {
+    const procs = parseWindows(winProcs, winCim, perf);
+    const { members } = selectMembers({ platform: "win32", procs, rootPid: 100 });
+    assert.equal(totalBytes(members), (10 + 30 + 20 + 25) * MB);
+    assert.equal(totalResidentBytes(members), (6 + 12 + 8 + 9) * MB);
+  });
+
+  it("returns null, never a partial sum, when any member lacks the figure", () => {
+    const procs = parseWindows(winProcs, winCim, perf.slice(0, 2));
+    const { members } = selectMembers({ platform: "win32", procs, rootPid: 100 });
+    assert.equal(totalResidentBytes(members), null);
+  });
+
+  it("works with no perf data at all (macOS, or the counter being unavailable)", () => {
+    const procs = parseWindows(winProcs, winCim);
+    const { members } = selectMembers({ platform: "win32", procs, rootPid: 100 });
+    assert.equal(totalResidentBytes(members), null);
+  });
+
+  const withResident = [
+    { t: 0, totalBytes: 105 * MB, residentTotalBytes: 40 * MB, procs: [{ pid: 1, name: "a", bytes: 105 * MB, residentBytes: 40 * MB }] },
+  ];
+
+  it("keeps the verdict on private bytes and reports the resident figure as context", () => {
+    const s = summarizeSamples(withResident);
+    assert.equal(s.verdict.level, "OVER");
+    assert.equal(s.maxResidentBytes, 40 * MB);
+  });
+
+  it("renders both figures when present and omits the secondary section when absent", () => {
+    const base = { platform: "win32", metric: "private bytes", settleSeconds: 120, intervalSeconds: 30 };
+    const both = renderMarkdown({ ...base, samples: withResident });
+    assert.match(both, /private working set max 40\.0 MB/);
+    assert.match(both, /Private working set \(MB\)/);
+    const only = renderMarkdown({
+      ...base,
+      samples: [{ t: 0, totalBytes: 50 * MB, residentTotalBytes: null, procs: [{ pid: 1, name: "a", bytes: 50 * MB }] }],
+    });
+    assert.doesNotMatch(only, /working set/i);
   });
 });
