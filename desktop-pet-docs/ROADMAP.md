@@ -103,8 +103,8 @@ Global search was removed from v1 (ADR-017). Phases 2–7 below are outlines; ea
 | F1-11 | Task state machine + history + transition UI | 2.0 | 🟡 Logic done (all 25 transitions + history); transition UI waits |
 | F1-12 | Dates, priority, project, overdue, defer | 1.5 | 🟡 Logic done (dates, priority, project, overdue, defer); UI waits |
 | F1-13 | Task detail: work updates, link note, history | 1.5 | 🟡 Part done (history, note link, delete rule); work updates ⬜ |
-| F1-14 | Task views: Today / Upcoming / Pending / All / Completed | 2.0 | ⬜ |
-| F1-15 | Daily log: live, freeze at rollover, missed days | 3.0 | ⬜ |
+| F1-14 | Task views: Today / Upcoming / Pending / All / Completed | 2.0 | 🟡 Logic done (all five views, filters); UI waits |
+| F1-15 | Daily log: live, freeze at rollover, missed days | 3.0 | 🟡 Logic done (live, freeze, reconcile, freezer; 23 tests); UI waits |
 | F1-16 | Daily Logs view + compare + Markdown export | 1.5 | ⬜ |
 | | **Milestone total** | **13.0** | |
 Daily-log tests must cover midnight, DST, timezone change and a multi-day gap before this milestone closes (logs are immutable, so a bug is permanent).
