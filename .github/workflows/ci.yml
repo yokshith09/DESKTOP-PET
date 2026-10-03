@@ -44,6 +44,10 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Rust — clippy (warnings are errors)
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Rust — the libraries build on their own (no dev-dependency features)
+        # Test targets enable extra crate features through dev-dependencies, which can hide a
+        # missing feature in the real build. This caught `tokio::select!` needing `macros`.
+        run: cargo check --workspace --locked
       - name: Rust — tests
         run: cargo test --workspace --locked
       - name: Rust — coverage (reported now; the >85% floor applies once core has logic)
