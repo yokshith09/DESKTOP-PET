@@ -5,6 +5,7 @@
 
 pub mod bus;
 pub mod clock;
+pub mod daily_log;
 pub mod db;
 pub mod error;
 pub mod events;
