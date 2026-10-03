@@ -1,0 +1,132 @@
+// Pure logic for the preliminary V-2 RAM measurement (F0-02, ADR-018).
+// No I/O here, so every rule below is unit-tested against fixtures. The collector
+// (measure.mjs) only gathers process listings and feeds them in.
+
+const MB = 1024 * 1024;
+export const BUDGET_MB = 100;
+
+/** Every pid that is `rootPid` or a descendant of it. */
+export function descendants(procs, rootPid) {
+  const kids = new Map();
+  for (const p of procs) {
+    if (!kids.has(p.ppid)) kids.set(p.ppid, []);
+    kids.get(p.ppid).push(p.pid);
+  }
+  const out = new Set([rootPid]);
+  const stack = [rootPid];
+  while (stack.length) {
+    for (const k of kids.get(stack.pop()) ?? []) {
+      if (!out.has(k)) {
+        out.add(k);
+        stack.push(k);
+      }
+    }
+  }
+  return out;
+}
+
+const asArray = (x) => (Array.isArray(x) ? x : x ? [x] : []);
+
+/** Windows: Get-Process (private bytes) joined with Win32_Process (parent ids). */
+export function parseWindows(processJson, cimJson) {
+  const parent = new Map(asArray(cimJson).map((c) => [c.ProcessId, c.ParentProcessId]));
+  return asArray(processJson).map((p) => ({
+    pid: p.Id,
+    ppid: parent.get(p.Id) ?? 0,
+    name: p.ProcessName,
+    bytes: p.PrivateMemorySize64,
+  }));
+}
+
+/** macOS: `ps -axo pid=,ppid=,rss=,comm=` (rss in KB; comm may contain spaces). */
+export function parsePs(text) {
+  return text
+    .split("\n")
+    .map((l) => l.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/))
+    .filter(Boolean)
+    .map((m) => ({ pid: +m[1], ppid: +m[2], name: m[4], bytes: +m[3] * 1024 }));
+}
+
+/** First line of `footprint -p PID`, e.g. "loaf [123]: 64-bit  Footprint: 33 MB (...)". */
+export function parseFootprint(text) {
+  const m = text.match(/Footprint:\s*([\d.]+)\s*(B|KB|MB|GB)\b/i);
+  if (!m) return null;
+  const unit = { b: 1, kb: 1024, mb: MB, gb: 1024 * MB }[m[2].toLowerCase()];
+  return Math.round(parseFloat(m[1]) * unit);
+}
+
+const isWebview = (platform, name) =>
+  platform === "win32" ? /msedgewebview2/i.test(name) : /com\.apple\.WebKit\./.test(name);
+
+/**
+ * The processes that belong to Loaf. Windows: the app and all descendants (WebView2
+ * children are real children). macOS: the app and descendants, plus WebKit helper
+ * processes that appeared after launch — WKWebView helpers are started over XPC and
+ * are NOT children of the app, so they are matched by name and absence from `baseline`.
+ */
+export function selectMembers({ platform, procs, rootPid, baseline = new Set() }) {
+  const tree = descendants(procs, rootPid);
+  let members = procs.filter((p) => tree.has(p.pid));
+  if (platform === "darwin") {
+    members = members.concat(
+      procs.filter((p) => isWebview(platform, p.name) && !baseline.has(p.pid) && !tree.has(p.pid)),
+    );
+  }
+  const webviewCount = members.filter((p) => isWebview(platform, p.name)).length;
+  return { members, webviewCount };
+}
+
+export const totalBytes = (members) => members.reduce((a, p) => a + p.bytes, 0);
+
+/** Bands from plan §3 CP1 decision point 1 and ADR-018. */
+export function verdict(maxBytes) {
+  const mb = maxBytes / MB;
+  if (mb < 80) return { level: "PASS", text: "under 80 MB — comfortably within the 100 MB budget" };
+  if (mb <= BUDGET_MB)
+    return { level: "MARGINAL", text: "80–100 MB — within budget, but runner noise could hide a real failure; confirm on real hardware" };
+  if (mb <= 120)
+    return { level: "OVER", text: "100–120 MB — over budget, but within runner noise; confirm on real hardware before writing an ADR" };
+  return { level: "FAIL", text: "over 120 MB — stop before F0-13 and write the V-2 ADR" };
+}
+
+const mb1 = (b) => (b / MB).toFixed(1);
+
+export function summarizeSamples(samples) {
+  const totals = samples.map((s) => s.totalBytes);
+  const maxBytes = Math.max(...totals);
+  const meanBytes = totals.reduce((a, b) => a + b, 0) / totals.length;
+  const peak = samples[totals.indexOf(maxBytes)];
+  return { maxBytes, meanBytes, peak, verdict: verdict(maxBytes) };
+}
+
+export function renderMarkdown(report) {
+  const { platform, metric, settleSeconds, intervalSeconds, samples } = report;
+  const s = summarizeSamples(samples);
+  const rows = s.peak.procs
+    .slice()
+    .sort((a, b) => b.bytes - a.bytes)
+    .map((p) => `| ${p.pid} | ${p.name} | ${mb1(p.bytes)} |`);
+  return [
+    `### V-2 preliminary RAM — ${platform} (CI runner, hello-world bundle)`,
+    "",
+    `**${s.verdict.level}** — ${s.verdict.text}.`,
+    "",
+    `Sum across all Loaf processes: **max ${mb1(s.maxBytes)} MB**, mean ${mb1(s.meanBytes)} MB over ${samples.length} samples ` +
+      `(${settleSeconds}s settle, every ${intervalSeconds}s). Metric: ${metric}.`,
+    "",
+    "| Sample (s) | Total (MB) |",
+    "|-----------:|-----------:|",
+    ...samples.map((x) => `| ${x.t} | ${mb1(x.totalBytes)} |`),
+    "",
+    "Processes at the peak sample:",
+    "",
+    "| PID | Process | MB |",
+    "|----:|---------|---:|",
+    ...rows,
+    "",
+    "> Preliminary. A shared CI VM is not a user's machine: different webview build, no GPU, other load. " +
+      "Windows reports private bytes; macOS reports physical footprint where `footprint` parses, otherwise RSS " +
+      "(an upper bound that counts shared pages). This number gates work (plan §3); it does not replace the final F0-12 measurement.",
+    "",
+  ].join("\n");
+}

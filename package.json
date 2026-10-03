@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "check:core-deps": "node scripts/check-core-no-tauri.mjs",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test:scripts": "node --test \"scripts/**/*.test.mjs\""
   },
   "dependencies": {
     "react": "18.3.1",

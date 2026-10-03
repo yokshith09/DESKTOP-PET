@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # TRD §9: fmt, clippy -D warnings, tests, coverage, lint, build — on both target OSes.
+  checks:
+    name: checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version comes from package.json "packageManager"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install the pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - run: pnpm install --frozen-lockfile
+
+      - name: Rust — format
+        run: cargo fmt --all -- --check
+      - name: Rust — clippy (warnings are errors)
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Rust — tests
+        run: cargo test --workspace --locked
+      - name: Rust — coverage (reported now; the >85% floor applies once core has logic)
+        run: cargo llvm-cov --workspace --locked --summary-only
+
+      - name: Frontend — typecheck
+        run: pnpm typecheck
+      - name: Frontend — lint
+        run: pnpm lint
+      - name: Frontend — tests with coverage
+        run: pnpm test:coverage
+      - name: Tooling — script tests
+        run: pnpm test:scripts
+      - name: Guard — loaf-core must not depend on tauri (ADR-002)
+        run: pnpm check:core-deps
+
+      - name: Build the app (no installer; bundling is CP5)
+        run: pnpm tauri build --no-bundle
+
+  # F0-02 / ADR-018: preliminary V-2. Informational — it reports a number for a human decision
+  # (plan §3 decision point 1) and fails only when the run cannot be measured.
+  v2-ram:
+    name: v2-ram (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            build: pnpm tauri build --no-bundle
+            exe: target/release/loaf.exe
+          - os: macos-latest
+            build: pnpm tauri build --bundles app
+            exe: target/release/bundle/macos/Loaf.app/Contents/MacOS/loaf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: pnpm install --frozen-lockfile
+      - name: Build the hello-world release bundle
+        run: ${{ matrix.build }}
+      - name: Measure total RAM of all Loaf processes (2 min settle, 5 min sampling)
+        run: node scripts/ram/measure.mjs --exe "${{ matrix.exe }}" --settle 120 --duration 300 --interval 30 --out ram-report
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v2-ram-${{ matrix.os }}
+          path: ram-report.*
+          if-no-files-found: warn
