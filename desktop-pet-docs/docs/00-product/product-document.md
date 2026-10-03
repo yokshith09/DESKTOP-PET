@@ -1,5 +1,5 @@
 # LOAF — Product Document
-**Version 1.3** · **Status: 🔒 LOCKED (D0) · amended D0-A1, D0-A2, D0-A3**  
+**Version 1.4** · **Status: 🔒 LOCKED (D0) · amended D0-A1 … D0-A4**  
 **Last updated:** October 3, 2026 (see §15 Amendments)
 
 ---
@@ -141,7 +141,6 @@ Examples:
 | **Color** | Visual grouping (system provides 6–8 standard colors) |
 | **Pin** | Boolean flag to keep note at top of list |
 | **Archive** | Boolean flag to move note out of active view |
-| **Search** | Full-text search across title, body, labels |
 | **Created** | ISO timestamp of creation |
 | **Last Edited** | ISO timestamp of last modification |
 
@@ -154,7 +153,6 @@ Examples:
 - Archive/unarchive
 - Delete permanently
 - Restore from archive
-- Search across all notes
 - Sort by: recently edited, created date, label, color, pin status
 - Support for plain text and Markdown
 - Survive application restart
@@ -208,7 +206,6 @@ CREATE → ACTIVE → EDIT → ACTIVE → ARCHIVE → RESTORE → ACTIVE → DEL
 - Add work updates (progress notes)
 - View completion history (what was done, when)
 - Link tasks to notes
-- Search tasks by title, description, tags
 - Filter tasks by status, date, priority, project
 - See pending tasks (not yet started, not completed)
 - Fast task lookup by date
@@ -302,7 +299,7 @@ CANCELLED
 - Capture action items with assignees
 - Link action items to tasks
 - Later: auto-populate from voice/transcription
-- Search meetings by title, date, participant, decision
+- Filter meetings by date and participant
 - Generate meeting summary
 
 **Meeting to Task conversion:**
@@ -318,29 +315,9 @@ CANCELLED
 
 ---
 
-### 4.5 Search System (Priority P0 · Phase 1)
+### 4.5 Search System — ❌ REMOVED (D0-A4)
 
-**Definition:** Full-text search across all workspace content.
-
-**Search scope:**
-- Notes (title, body, labels)
-- Tasks (title, description, tags)
-- Meetings (title, discussion, decisions, participants)
-- Daily logs (aggregated content)
-
-**Search capabilities:**
-- Full-text search (matches partial words)
-- Filter by type (notes, tasks, meetings)
-- Filter by date range
-- Filter by label/tag
-- Filter by status (for tasks)
-- Sort results by relevance, date, type
-- Search is case-insensitive
-- Special characters are indexed (e.g., #hashtags, @mentions)
-
-**Performance constraint:**
-- Search completes in <500ms for typical workspace (5000+ items)
-- Uses SQLite FTS5 (Full Text Search)
+Global search was withdrawn by the product owner on 2026-10-03 (ADR-017). The workspace is navigated through sidebar views, label filters, and per-view filters and sorts: notes by label, tasks by status/priority/project/date, meetings by date and participant. No full-text index exists. Section number 4.5 is kept so §4.6 onward do not renumber.
 
 ---
 
@@ -545,7 +522,7 @@ Safari Extension ──┘
 | **Privacy** | Data export (all data as JSON), Data delete (confirm & wipe all), Encryption at rest (yes/no) |
 | **Notifications** | Pet reactions (yes/no), Task notifications (yes/no), Browser notifications (yes/no) |
 | **Appearance** | Light/dark theme, Font size, Language (English, others later) |
-| **Keyboard** | Shortcuts for new note, new task, show/hide pet, search |
+| **Keyboard** | Shortcuts for new note, new task, show/hide pet |
 | **Advanced** | SQLite path (for backup), Log level (debug/info/warn), Clear cache, Reset to defaults |
 
 **Constraints:**
@@ -963,7 +940,6 @@ Pet returns to idle state
 | **App startup time** | <2 seconds |
 | **Note creation** | <100ms |
 | **Task creation** | <100ms |
-| **Search across 5000 items** | <500ms |
 | **Daily log generation** | <500ms |
 | **Dashboard render** | <300ms |
 | **Pet animation framerate** | 30 FPS (not 60) |
@@ -1083,7 +1059,7 @@ The following are explicitly **not** part of the initial release but may be adde
         │         │             │           │
     ┌─App    ┌─SQLite       ├─ JEV      ├─Gmail
     ├─Browser├─Backup      ├─Whisper   ├─GitHub
-    ├─Focus  ├─Search       ├─Intent    ├─Slack
+    ├─Focus  ├─Lists        ├─Intent    ├─Slack
     └─File   └─Export       └─Actions   ├─Calendar
                                         └─Custom
 
@@ -1095,7 +1071,7 @@ The following are explicitly **not** part of the initial release but may be adde
 
 - **Owner:** [Product Manager]
 - **Last Updated:** October 3, 2026
-- **Version:** 1.3
+- **Version:** 1.4
 - **Status:** 🔒 Locked · amended (see §15)
 
 ---
@@ -1146,3 +1122,9 @@ Scope is unchanged — nothing moved into or out of v1. Three knock-on effects, 
 ### Amendment D0-A3 (2026-10-03) — CI moves after MCP
 
 The product owner decided CI is built after MCP integration. §4.13 splits: git and local-build awareness stay in **Phase 4**; CI status, CI reactions, deployment events and CI-failure task suggestions move to **Phase 5.1**, after MCP and before Voice. No phase renumbering and no change to v1 scope. CI authenticates through the Phase 5 GitHub login, replacing the pasted-token assumption in D0-A2's knock-on notes. See ADR-016 and `02-build-order.md` A-4.
+
+### Amendment D0-A4 (2026-10-03) — global search removed
+
+The product owner will not use search, so it is out of v1. This withdraws **§4.5 in full**, and every search line item elsewhere in this document: "Search" in the Note entity table (§4.1) and capabilities, "Search tasks" (§4.2), "Search meetings" (§4.4 → replaced by a date/participant filter), "search" in the Keyboard settings row (§4.10), the "<500ms search across 5000 items" target (§9.1), and the Search node in the §13 diagram. Where any remaining text conflicts, this amendment governs.
+
+Not affected: per-view filters and sorts, label and participant autocomplete, and the Phase 2 Browser Tabs "Search and filter"/"Search tabs by title" lines (§4.7, §4.9) — those are list filtering and will be specified in Phase 2's PRD addendum. Scope that remains in v1 is otherwise unchanged. See ADR-017.

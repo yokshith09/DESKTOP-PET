@@ -1,8 +1,8 @@
 # Loaf — App Flow: Surfaces, Screens & Navigation
 
-**Milestone:** D4 · **Version:** 1.1 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
-**Derives from:** PRD (D2 v1.1) · **Feeds:** UI/UX Brief (D5), Implementation Plan (D7)
-**Changes in v1.1:** §7 phase numbers reconciled with D0 Amendment D0-A1 (Integrations 5, Voice 6, Characters 7; order per ADR-015); no screen or flow changed.
+**Milestone:** D4 · **Version:** 1.2 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
+**Derives from:** PRD (D2 v1.4) · **Feeds:** UI/UX Brief (D5), Implementation Plan (D7)
+**Changes in v1.1:** §7 phase numbers reconciled with D0 Amendment D0-A1 (Integrations 5, Voice 6, Characters 7; order per ADR-015); no screen or flow changed. **v1.2:** S-50 Search and flow F-F withdrawn (D4-A2).
 
 Scope: Phase 0 + Phase 1. Every screen has an ID (`S-xx`); every transition is listed. No screen may exist in code that isn't in this file.
 
@@ -35,7 +35,7 @@ Loaf has three surfaces. Only one of them is a "normal" window.
 | S-31 | Meeting editor | Detail panel / full | Meeting row, New meeting | R1-30..R1-34 |
 | S-40 | Daily Logs | View (calendar strip + list) | Sidebar | R1-44 |
 | S-41 | Daily Log detail | Detail panel | Log row, Today "Yesterday" card | R1-41..R1-45 |
-| S-50 | Search | Overlay (command-palette style) | `Ctrl/Cmd+K`, tray Search, sidebar search box | R1-50..R1-56 |
+| S-50 | ~~Search~~ — **withdrawn (D4-A2, ADR-017)**. ID retired, not reused | — | — | R1-50..R1-56 removed |
 | S-60 | Settings | View with sections: General · Pet · Shortcuts · Data · Advanced · About | Sidebar bottom, tray | R1-80 |
 | S-61 | Delete-all confirm | Modal (type `DELETE`) | Settings › Data | R0-09 |
 | S-62 | Import confirm | Modal | Settings › Data | R0-08 |
@@ -51,7 +51,6 @@ flowchart TB
         T_OPEN[Open Loaf]
         T_NOTE[New Note]
         T_TASK[New Task]
-        T_SRCH[Search]
         T_PET[Show/Hide Pet]
         T_SET[Settings]
         T_QUIT[Quit]
@@ -61,7 +60,6 @@ flowchart TB
     T_OPEN --> TODAY
     T_NOTE --> NED
     T_TASK --> QA[SF-4 Quick add]
-    T_SRCH --> SRCH
     T_SET --> SET
 
     START([Launch]) --> CHK{DB check ok?}
@@ -99,10 +97,6 @@ flowchart TB
     SET -- delete all --> DEL[S-61 Confirm] --> FR
     SET -- import --> IMP[S-62 Confirm] --> TODAY
 
-    SRCH[S-50 Search overlay] -- note hit --> NED
-    SRCH -- task hit --> TD
-    SRCH -- meeting hit --> MED
-    SRCH -- log hit --> LD
 ```
 
 ## 4. Core Flows
@@ -136,8 +130,8 @@ Available actions per state appear as buttons in the task row and detail (only v
 3. Each action item → **Convert to task** → task created; item shows a live status chip linking to it
 4. Follow-up date set → appears on Today on that date
 
-### F-F · Find anything
-`Ctrl/Cmd+K` → type → grouped results (Notes · Tasks · Meetings · Logs) → ↑↓ → Enter opens in detail panel → Esc closes overlay.
+### F-F · ~~Find anything~~ — withdrawn (D4-A2)
+There is no global search. To find something, open its sidebar view and use that view's filter: notes by label, tasks by status/priority/project/date, meetings by date and participant, logs by date. Letter F is retired so G and H keep their references.
 
 ### F-G · Review a past day
 Sidebar › Daily Logs → pick date → log detail (sections + stats + Δ vs previous day) → Export as Markdown.
@@ -151,7 +145,6 @@ Close button → window hides (first time only: one-time hint "Loaf keeps runnin
 Open Loaf                 
 New Note           ⇧⌘N / Ctrl+Shift+N
 New Task           ⇧⌘T / Ctrl+Shift+T
-Search             ⇧⌘K / Ctrl+Shift+K
 ───────────────
 Hide Pet / Show Pet  ⇧⌘P / Ctrl+Shift+P
 ───────────────
@@ -184,3 +177,10 @@ Windows: left-click tray icon = Open Loaf; right-click = menu. macOS: click = me
 | Characters / Closet | 7 | Settings › Pet › Characters |
 
 Sidebar order is designed now so later items slot in without reshuffling muscle memory: **Today · (Dashboard) · Tasks · Notes · Meetings · Daily Logs · — · Archive · Settings**.
+
+---
+
+## 8. Amendments
+
+### Amendment D4-A2 (2026-10-03) — search removed
+S-50 (Search overlay), flow F-F, the tray "Search" item and the sidebar search box are withdrawn (ADR-017). IDs are retired, not reused. The `Ctrl/Cmd+Shift+K` and `Ctrl/Cmd+K` shortcuts are freed. Tray menu: Open Loaf · New Note · New Task · — · Hide/Show Pet · — · Settings · Quit.

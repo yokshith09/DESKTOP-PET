@@ -189,25 +189,7 @@ BEGIN SELECT RAISE(ABORT, 'daily_logs are immutable'); END;
 CREATE TRIGGER daily_logs_no_delete BEFORE DELETE ON daily_logs
 BEGIN SELECT RAISE(ABORT, 'daily_logs cannot be deleted'); END;
 
--- ───────────────────────────────── Search ────────────────────────────────
--- One unified FTS5 index, maintained by the Rust repository layer inside the
--- same transaction as the source write (see backend-schema.md §5).
-CREATE VIRTUAL TABLE search_index USING fts5(
-    entity_type UNINDEXED,                    -- 'note' | 'task' | 'meeting' | 'daily_log'
-    entity_id   UNINDEXED,
-    title,
-    body,
-    extra,                                    -- labels, project, participants, decisions…
-    tokenize = "unicode61 remove_diacritics 2 tokenchars '#@'",
-    prefix   = '2 3'
-);
-
--- Lookup table so updates/deletes can find the FTS rowid without scanning.
-CREATE TABLE search_map (
-    entity_type TEXT NOT NULL,
-    entity_id   TEXT NOT NULL,
-    fts_rowid   INTEGER NOT NULL,
-    PRIMARY KEY (entity_type, entity_id)
-) STRICT, WITHOUT ROWID;
+-- No search tables: global search was withdrawn (ADR-017). Re-adding it is a
+-- new migration that creates the index and backfills it from the source tables.
 
 -- `PRAGMA user_version = 1` is set by the migration runner, not here (see header).

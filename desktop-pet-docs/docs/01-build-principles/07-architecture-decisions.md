@@ -1,6 +1,6 @@
 # Architecture Decisions — ADR Log
 
-> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **ADR-014, ADR-015, ADR-016 appended 2026-10-03**. Existing ADRs change only via a new ADR that supersedes them. New ADRs may be appended at any time.
+> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **ADR-014 … ADR-018 appended 2026-10-03**. Existing ADRs change only via a new ADR that supersedes them. New ADRs may be appended at any time.
 
 Each decision records **what we chose, why, what we rejected, and what it costs**. Confidence tags: [Certain] verified fact, [Likely] strong inference, [Guessing] must be verified in Phase 0.
 
@@ -53,7 +53,7 @@ Each decision records **what we chose, why, what we rejected, and what it costs*
 
 ## ADR-006: Search via SQLite FTS5
 
-**Status:** Accepted · **superseded in part by ADR-014** (the "kept in sync with triggers" clause only; FTS5 itself stands).
+**Status:** ~~Accepted~~ **Superseded by ADR-017** (global search removed). Previously superseded in part by ADR-014. Text below is the original decision, kept as the record.
 
 **Decision:** FTS5 virtual tables for notes, tasks, meetings, daily logs, kept in sync with triggers. Single search query unions the indexes and ranks with `bm25`.
 **Why:** Meets <500 ms on 5000 items without external engines.
@@ -118,7 +118,7 @@ Any new exception requires a new ADR.
 
 ## ADR-014: Search index maintained by the repository layer, not SQL triggers
 
-**Status:** Accepted (2026-10-03) · **Supersedes ADR-006** on the sync mechanism only. FTS5 as the search engine, the single unified index, and `bm25` ranking are unchanged.
+**Status:** ~~Accepted~~ **Superseded by ADR-017** (the index it maintained no longer exists). Originally accepted 2026-10-03, superseding ADR-006 on the sync mechanism only.
 
 **Decision:** The FTS5 index is written by Rust. Every repository write that changes indexed text calls `search::reindex(entity)` **inside the same transaction** as the source write. No `CREATE TRIGGER` keeps `search_index` in sync.
 
@@ -164,6 +164,38 @@ Any new exception requires a new ADR.
 
 ---
 
+## ADR-017: Global search removed from v1
+
+**Status:** Accepted (2026-10-03) · **Supersedes ADR-006 and ADR-014.**
+
+**Decision:** v1 has no global search. No FTS5 index, no `search_map`, no search service or IPC command, no overlay, no tray item, no `Mod+K`/`Mod+Shift+K`, no "Rebuild search index" setting, no V-4. Discovery uses sidebar views plus per-view filters and sorts (notes by label, tasks by status/priority/project/date, meetings by date and participant, logs by date).
+
+**Why:** Product-owner decision — they will not use it. Removing it deletes the highest-maintenance invariant in the schema (an index that must equal a from-scratch rebuild after every write, ADR-014), a ~12 MB index, a performance budget, one verification task, and 4.5 relative dev-days (F1-20, F1-21).
+
+**Rejected:** Keeping the index without a UI (dead weight and an invariant nobody benefits from). A plain `LIKE` search (Principle 9 would normally start there, but the owner wants none).
+
+**Cost / Risk:** [Likely] finding an old note, task or meeting gets harder as the workspace grows past a few hundred items — browsing and label filters do not scale like search, and daily logs are reachable by date only. The exported JSON remains searchable with any external tool. This is reversible but not free: reinstating search is a new migration that creates and backfills the index, plus the ADR-014 discipline across every repository write. Doing it later costs more than not having built it, which is the trade being accepted.
+
+**Verification:** No migration contains `fts5` or `search_index`; no IPC command named `search*`; PRD R1-50…R1-56 retired. Phase 2 "search tabs by title" is unaffected and specified separately.
+
+---
+
+## ADR-018: V-2 measured early on CI runners
+
+**Status:** Accepted (2026-10-03) · Refines the placement of V-2; ADR-001's decision stands.
+
+**Decision:** F0-02 (CI) includes a `v2-ram` job that builds the hello-world bundle from F0-01 on `windows-latest` and `macos-latest`, lets it settle for 2 minutes, samples for 5, and reports the **sum across all Loaf processes including webview children**. The final V-2 measurement stays in F0-12 on the real app. If the preliminary sum exceeds 100 MB on either OS, work stops before F0-13 and a new ADR is written (re-scope the budget, trim the webview, or reconsider the shell). Results within 20% of the budget (80–120 MB) must be confirmed on real hardware before that ADR.
+
+**Why:** V-2 is the largest risk in the project (09, plan §10). The locked plan measured it in F0-12, after about 17 of CP1's 20 days, so a failure would have invalidated the scaffold, bus, DB layer and shell. Measuring a hello-world in F0-02 costs about half a day.
+
+**Rejected:** Waiting for F0-12 (late). Measuring only on the owner's machines (hardware availability unknown, one OS at most may be covered).
+
+**Cost / Risk:** [Guessing] CI runners are shared VMs with different WebView2/WebKit builds and no GPU, so absolute numbers may not match a user's machine. Hence the confirm band and the second, final measurement.
+
+**Verification:** The job writes a per-process table to the run summary and uploads it as an artifact; the numbers are appended to this file as an amendment.
+
+---
+
 ## Phase 0 Verification Tasks
 
 These are [Guessing]/[Likely] items that must be measured before Phase 1 starts. Results are appended to this file as amendments.
@@ -171,9 +203,9 @@ These are [Guessing]/[Likely] items that must be measured before Phase 1 starts.
 | ID | Question | Pass condition | If it fails |
 |----|----------|----------------|-------------|
 | V-1 | Does Tauri v2 run on macOS 10.13? | Hello-world bundle launches on the minimum target | Amend product constraint to real minimum |
-| V-2 | Total RAM of Tauri app + webview processes at idle | <100 MB summed across all processes, both OSes | Re-scope budget definition in 09 or reconsider shell (new ADR) |
+| V-2 | Total RAM of Tauri app + webview processes at idle | <100 MB summed across all processes, both OSes. **Measured twice:** preliminary on CI runners in F0-02 (ADR-018), final in F0-12 | Re-scope budget definition in 09 or reconsider shell (new ADR) |
 | V-3 | Idle CPU/GPU with pet window visible and animating | CPU <1% at rest, no sustained GPU load | Lower FPS, pause when occluded, or render via native canvas |
-| V-4 | FTS5 search at 5000 mixed items | <500 ms p95 | Tune tokenizer/ranking or adopt Tantivy (new ADR) |
+| ~~V-4~~ | ~~FTS5 search at 5000 mixed items~~ — **withdrawn (ADR-017)** | — | — |
 | V-5 | Event bus throughput under simulated browser burst | No dropped events, no UI jank | Add buffering at source |
 
 ---

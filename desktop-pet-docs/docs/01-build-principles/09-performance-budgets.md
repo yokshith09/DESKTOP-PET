@@ -26,8 +26,6 @@ A budget is the **maximum cost a feature is allowed to add**. If you can't measu
 | Create / edit / delete note or task | <100 ms to UI update |
 | Pin, archive, label, color change | <100 ms |
 | Open note / task / meeting | <150 ms |
-| Search (5000 items, all types) | <500 ms |
-| Search keystroke → results (debounced 300 ms) | <800 ms total |
 | Daily Log view render | <300 ms |
 | Dashboard render (Phase 2) | <300 ms |
 | Close tab from dashboard → tab gone | <500 ms |
@@ -64,7 +62,7 @@ If Phase 0 measures a higher baseline, later allocations shrink — the total ne
 - Instrument the core: log a timestamp at process start and when the frontend signals "ready." Report median of 10 cold launches (after reboot or cache clear).
 
 ### Interactions
-- Rust benchmarks (`criterion`) for DB operations and search.
+- Rust benchmarks (`criterion`) for DB operations and list/view queries.
 - Frontend: Performance API marks around user action → render complete.
 - Seed fixture: 5000 mixed items (3000 notes, 1500 tasks, 300 meetings, 200 daily logs) generated deterministically.
 
@@ -92,9 +90,9 @@ If Phase 0 measures a higher baseline, later allocations shrink — the total ne
 
 *(Appended at the end of each phase. Empty until Phase 0 completes.)*
 
-| Phase | Date | OS | Idle CPU | RAM (sum) | Startup | Search p95 |
-|-------|------|----|----------|-----------|---------|-----------|
-| — | — | — | — | — | — | — |
+| Phase | Date | OS | Idle CPU | RAM (sum) | Startup |
+|-------|------|----|----------|-----------|---------|
+| — | — | — | — | — | — |
 
 ## Amendments
 
@@ -107,3 +105,6 @@ Per-phase allocation rows for Phases 4–6 reordered to follow the owner's phase
 ---
 
 Next: **10-team-coordination.md** (⏸ on hold) · **11-quality-gates.md** (⏸ on hold)
+
+### Amendment A-3 (2026-10-03)
+Global search is removed (ADR-017): the two search interaction budgets and the "Search p95" baseline column are deleted, and the 5000-item seed fixture now serves list and view rendering (Today, Tasks, Notes, Daily Log <300 ms) rather than search. Separately, V-2 gets a preliminary CI-runner measurement in F0-02 (ADR-018); the global RAM budget itself is unchanged.

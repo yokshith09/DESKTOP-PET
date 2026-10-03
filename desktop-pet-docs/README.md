@@ -24,7 +24,8 @@ Event-driven (no polling) · Idle CPU <1% · RAM <100 MB · Local-first SQLite �
 | Date | Decision |
 |------|----------|
 | 2026-10-03 | PRD §9 decisions **D-1 … D-10 approved**; D2–D7 locked |
-| 2026-10-03 | **ADR-014** accepted — FTS index maintained by the repository layer, superseding ADR-006's trigger clause |
+| 2026-10-03 | **ADR-014** accepted, then **superseded by ADR-017** — global search removed (no FTS5, overlay, or V-4) |
+| 2026-10-03 | **ADR-018** — V-2 (RAM) measured early on CI runners in F0-02 |
 | 2026-10-03 | **D0-A2 / ADR-015** — owner set phase order: Pet 3 → Developer 4 → MCP 5 (+ client scaffold, OAuth) → Voice 6 → Characters 7 |
 | 2026-10-03 | **D0-A3 / ADR-016** — CI status built after MCP as Phase 5.1; Phase 4 is local git/build only and offline |
 | 2026-10-03 | **D6-A1** — four schema corrections (migration transaction ownership, no `DELETED` task event, Unicode label folding, ADR-014 reference) |
@@ -39,7 +40,7 @@ measured in `F0-01` and `F0-12`. **V-2 (total RAM <100 MB)** is the one that can
 force a new ADR before CP2.
 
 ## Milestones
-`D0–D7 docs` → **CP1** Foundation + verification → CP2 Notes → CP3 Tasks + Daily Log → CP4 Meetings, Search, Pet, Today → **CP5 v1.0.0** → M2 Browser → M3 Pet → M4 Developer → M5 MCP → M5.1 CI → M6 Voice → M7 Characters
+`D0–D7 docs` → **CP1** Foundation + verification → CP2 Notes → CP3 Tasks + Daily Log → CP4 Meetings, Pet, Today → **CP5 v1.0.0** → M2 Browser → M3 Pet → M4 Developer → M5 MCP → M5.1 CI → M6 Voice → M7 Characters
 
 ## Repository layout
 ```

@@ -57,7 +57,7 @@ Feature IDs are authoritative in `docs/06-plan/implementation-plan.md`. No calen
 | **CP1 — Foundation & Verification** | Tauri scaffold (Win + macOS), event bus, SQLite + migrations, settings, tray, single instance, auto-start, CI | V-1…V-5 measured and recorded; 08/10/11 unlocked and written; Phase 0 acceptance criteria pass |
 | CP2 — Notes Core | F1-01…F1-09 | Notes usable end-to-end, survives restart |
 | CP3 — Tasks & Daily Log | F1-10…F1-16 | Task lifecycle + auto-generated daily log correct across midnight |
-| CP4 — Meetings, Search, Pet, Today, Settings | F1-17…F1-26 | Search <500 ms at 5000 items; minimal pet present |
+| CP4 — Meetings, Pet, Today, Settings | F1-17…F1-19, F1-22…F1-26 (F1-20/21 cancelled) | Minimal pet present; views <300 ms at 5000 items |
 | **CP5 — Phase 1 Release** | F1-27 · shipping checklist (02) on both OSes | First public release |
 
 ### Stage C — Product Phases (after first release)
@@ -93,7 +93,7 @@ amendment in the document that owns the decision.
 | # | Finding | Severity | Resolved in |
 |---|---------|----------|-------------|
 | 1 | D2–D7 blocked on PRD §9 approval | Blocker | PRD §9 approved; D2–D7 locked |
-| 2 | ADR-006 (locked) mandated trigger-based FTS sync; D6 §3.8 rejected triggers | Contradiction between locked and derived docs | **ADR-014** supersedes ADR-006 on the mechanism; 05 Amendment A-1; TRD §5 |
+| 2 | ADR-006 (locked) mandated trigger-based FTS sync; D6 §3.8 rejected triggers | Contradiction between locked and derived docs | **ADR-014** superseded ADR-006 on the mechanism; **both later superseded by ADR-017** (search removed) |
 | 3 | D0 phase numbers (Voice P3, MCP P3–P4, Dev P4, Characters P5) contradicted 02/PRD/plan (4/6/5/7) | Contradiction in the locked source of truth | Owner set the order: Pet 3 → Developer 4 → MCP 5 → CI 5.1 → Voice 6 → Characters 7. **D0-A2, 02 A-3, ADR-015**; PRD §8; D4 §7; 09 A-1 |
 | 4 | `task_events.kind = 'DELETED'` unreachable — `task_id` cascades | Schema defect | Schema Amendment D6-A1 #2; migration 001; PRD R1-29 |
 | 5 | Migration 001 embedded `BEGIN`/`COMMIT` + `user_version`, conflicting with the runner's transaction (ADR-007) | Schema defect — would fail at runtime | Schema Amendment D6-A1 #1; migration 001; TRD §5; plan F0-04 |
@@ -102,3 +102,13 @@ amendment in the document that owns the decision.
 
 Findings 4–6 were verified empirically against SQLite 3.45.1 before the fix was
 written, not reasoned about on paper.
+
+## Later Changes (2026-10-03)
+
+| Change | Where recorded |
+|--------|----------------|
+| Phase order set by the owner (Developer 4 → MCP 5 → Voice 6) | ADR-015, D0-A2, 02 A-3 |
+| CI status moved after MCP, as Phase 5.1 | ADR-016, D0-A3, 02 A-4 |
+| **Global search removed** — no FTS5, no overlay, no V-4 | ADR-017, D0-A4, D2-A4, D3-A2, D4-A2, D5-A2, D6-A3, D7-A1, 02 A-5 |
+| **V-2 (RAM) measured early on CI runners** | ADR-018, D7-A1 |
+| Leftovers fixed: stale "2–4 weeks" in 00; "Save/Cancel" sketch in 02 | 00 A-1, 02 A-5 |

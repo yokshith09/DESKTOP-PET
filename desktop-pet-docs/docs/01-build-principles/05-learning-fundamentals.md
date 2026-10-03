@@ -35,9 +35,8 @@ Any of these = stop, learn the concept, write it down, continue.
 
 | Concept | Why | Done when you can… |
 |---------|-----|--------------------|
-| SQLite FTS5 | Search <500 ms on 5000 items | Build an FTS5 table, keep it in sync **from the repository layer inside the write transaction** (ADR-014), rank results with `bm25` |
 | React state & rendering | Notes UI | Explain what triggers a re-render and prevent unnecessary ones |
-| Controlled inputs + debouncing | Search, editors | Implement a 300 ms debounce without a library |
+| Controlled inputs + debouncing | Autosave in editors | Implement an 800 ms debounce without a library |
 | Keyboard event handling | Shortcuts | Handle Ctrl/Cmd differences across OSes |
 | Date/time & timezones | Daily Log, due dates | Explain why you store UTC and render local |
 | Schema migrations | Data survives upgrades | Write a forward migration and test it against old data |
@@ -132,6 +131,9 @@ maintained by the repository layer inside the source write's transaction.
 The learning requirement is unchanged in substance — you must still be able
 to build an FTS5 table and rank results — but the mechanism to understand is
 transactional reindexing, not trigger authoring.
+
+### Amendment A-4 (2026-10-03)
+The SQLite FTS5 row is removed (ADR-017: no search in v1) and the debouncing row now targets editor autosave (800 ms, PRD R1-02) instead of search input. If search is reinstated, ADR-014's discipline (transactional reindexing) is the thing to learn.
 
 ---
 

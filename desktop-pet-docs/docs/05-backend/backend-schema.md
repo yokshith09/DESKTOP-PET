@@ -1,9 +1,9 @@
 # Loaf — Backend Schema
 
-**Milestone:** D6 · **Version:** 1.1 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
-**Executable source of truth:** [`migrations/001_initial.sql`](migrations/001_initial.sql) — applied against SQLite 3.45.1 inside a runner-owned transaction (FTS5, STRICT tables, triggers, constraints exercised).
-**Derives from:** PRD (D2), TRD (D3), ADR-005/007/014
-**Changes in v1.1:** see [§8 Amendments](#8-amendments).
+**Milestone:** D6 · **Version:** 1.2 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
+**Executable source of truth:** [`migrations/001_initial.sql`](migrations/001_initial.sql) — applied against SQLite 3.45.1 inside a runner-owned transaction (STRICT tables, triggers, constraints exercised).
+**Derives from:** PRD (D2), TRD (D3), ADR-005/007
+**Changes:** v1.1 and v1.2 — see [§8 Amendments](#8-amendments).
 
 ---
 
@@ -17,7 +17,7 @@
 | Booleans | `INTEGER 0/1` + `CHECK` | SQLite has no bool |
 | Tables | `STRICT` | Type errors fail loudly |
 | Enums | `TEXT` + `CHECK (x IN (...))` | Readable in exports, enforced in DB |
-| Lists | Child tables, never JSON arrays | Searchable, indexable, FK-safe (deviation from D0 §5.1 "text array") |
+| Lists | Child tables, never JSON arrays | Queryable, indexable, FK-safe (deviation from D0 §5.1 "text array") |
 | JSON | Only for `settings`, `user_preferences`, `daily_logs.snapshot` | These are documents, not relations |
 
 **Connection PRAGMAs** (set by Rust on every open): `journal_mode=WAL`, `foreign_keys=ON`, `synchronous=NORMAL`, `busy_timeout=5000`. On startup: `PRAGMA quick_check`; on failure, the app refuses to write and offers restore from the latest `.bak`.
@@ -40,13 +40,6 @@ erDiagram
     daily_logs {
         TEXT log_date PK
         TEXT snapshot "immutable JSON"
-    }
-    search_index {
-        TEXT entity_type
-        TEXT entity_id
-        TEXT title
-        TEXT body
-        TEXT extra
     }
 ```
 
@@ -147,23 +140,11 @@ Snapshot JSON, `snapshot_version = 1`:
 5. Skip insert if all lists are empty and all counts are zero (R1-43)
 6. `INSERT OR IGNORE` — rollover is idempotent
 
-### 3.8 Search: `search_index` (FTS5) + `search_map`
+### 3.8 Search — ❌ REMOVED (ADR-017)
 
-| Entity | `title` | `body` | `extra` |
-|--------|---------|--------|---------|
-| note | title | body (Markdown source) | label names |
-| task | title | description + work updates | project, priority, status |
-| meeting | title | notes + decisions + action items | participants, assignees |
-| daily_log | "Daily log YYYY-MM-DD" | all task titles in snapshot | — |
+Global search was withdrawn on 2026-10-03. Migration 001 creates no FTS5 table, no `search_map`, and no reindex hooks; repositories write source rows only. Section number kept so references to §3.9+ do not shift.
 
-Tokenizer: `unicode61 remove_diacritics 2 tokenchars '#@'` → case-insensitive, `#work` and `@name` stay single tokens. Prefix indexes `2 3` make `hac*` fast.
-
-**Why app-maintained, not triggers (ADR-014, supersedes ADR-006 on this point):** indexed text spans parent + child tables (labels, participants, decisions). Triggers on six tables would be fragile. Instead every repository write that changes indexed text calls `search::reindex(entity)` **inside the same transaction**. Guardrails:
-- Integration test: random CRUD sequence → index equals a from-scratch rebuild
-- Settings → Advanced → "Rebuild search index"
-- Startup: if `search_map` row count ≠ entity count, rebuild in background
-
-**Query shape:** user input is tokenized in Rust; each token becomes `"token"*` (quoted to neutralize FTS syntax); tokens are ANDed; filters (type, date, status, label, archived) applied by joining back to source tables; ranked with `bm25(search_index, 0, 0, 10.0, 4.0, 2.0)` (title weighted highest).
+If search is ever reinstated it arrives as migration 00N that creates the index and backfills it in one pass from the source tables, and the discipline from ADR-014 (reindex inside the source transaction, consistency test, rebuild command) returns with it.
 
 ## 4. Phase 2 Preview (migration 002 — not created yet)
 
@@ -202,8 +183,7 @@ Rules carried forward: writes buffered and flushed ≤1/min (ADR-005); untracked
 | Tasks + events + updates | 5,000 tasks, 25,000 events | 6 MB |
 | Meetings | 500 × 4 KB | 2 MB |
 | Daily logs | 365 × 6 KB | 2 MB |
-| FTS index | ~1× source text | 12 MB |
-| **Phase 1 total** | | **~26 MB** [Likely] |
+| **Phase 1 total** | | **~14 MB** [Likely] |
 
 Phase 2 activity data is the real growth risk; its PRD addendum must define retention (e.g., raw tab events 90 days, daily aggregates forever) to stay under the 100 MB target.
 
@@ -227,7 +207,7 @@ Phase 2 activity data is the real growth risk; its PRD addendum must define rete
 }
 ```
 
-The search index is never exported; it is rebuilt after import. `labels` rows carry both `name` and `name_folded`; import recomputes `name_folded` from `name` rather than trusting the file, so an export edited by hand cannot smuggle in a duplicate label.
+`labels` rows carry both `name` and `name_folded`; import recomputes `name_folded` from `name` rather than trusting the file, so an export edited by hand cannot smuggle in a duplicate label.
 
 ---
 
@@ -246,3 +226,6 @@ Applied before lock, after a cross-document consistency review. Schema version s
 
 ### Amendment D6-A2 (2026-10-03) — comment only
 The `meetings.transcript` comment in `001_initial.sql` and §3.6 now say Phase 6 (Voice), per ADR-015. No column, constraint or schema version changed.
+
+### Amendment D6-A3 (2026-10-03) — search tables removed
+Per ADR-017, `001_initial.sql` no longer creates `search_index` (FTS5) or `search_map`, and §3.8, the ER diagram entry, the FTS size row (Phase 1 total ~26 → ~14 MB [Likely]) and the export note are updated. Schema version stays `1`: no code or user database exists, so the file is edited in place rather than superseded by a `002`. Nothing else in the schema changed; the 3 triggers, `name_folded` and the cascade rules are untouched.

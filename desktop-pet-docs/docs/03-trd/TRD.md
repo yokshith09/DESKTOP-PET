@@ -1,9 +1,9 @@
 # Loaf — Technical Requirements Document (TRD)
 
-**Milestone:** D3 · **Version:** 1.1 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
-**Derives from:** PRD (D2 v1.1), ADR-001…014 (`01-build-principles/07-architecture-decisions.md`), budgets (`09-performance-budgets.md`)
-**Schema:** `05-backend/backend-schema.md` (D6 v1.1)
-**Changes in v1.1:** see §12.
+**Milestone:** D3 · **Version:** 1.2 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
+**Derives from:** PRD (D2 v1.4), ADR-001…017 (`01-build-principles/07-architecture-decisions.md`), budgets (`09-performance-budgets.md`)
+**Schema:** `05-backend/backend-schema.md` (D6 v1.2)
+**Changes:** v1.1 and v1.2 — see §12.
 
 This TRD defines **how** Phase 0 and Phase 1 are built: components, threads, events, IPC contracts, OS integration, and verification. It does not restate ADR rationale — it applies it.
 
@@ -25,7 +25,6 @@ flowchart LR
         BUS[(Event bus<br/>tokio broadcast)]
         DBW[DB writer task]
         DBR[Read pool]
-        SRCH[Search service]
         LOG[Daily-log service]
         SCHED[Rollover scheduler]
         SET[Settings service]
@@ -33,7 +32,7 @@ flowchart LR
         FWD[UI forwarder]
     end
 
-    DB[(SQLite loaf.db<br/>WAL + FTS5)]
+    DB[(SQLite loaf.db<br/>WAL)]
 
     subgraph UI["Webviews"]
         MAIN[Main window<br/>React + TS]
@@ -53,7 +52,6 @@ flowchart LR
     BUS --> FWD
     LOG --> DBW
     DBR --> DB
-    SRCH --> DBR
     CMD -. queries .-> DBR
     FWD -- emit --> MAIN
     FWD -- emit --> PET
@@ -67,7 +65,7 @@ flowchart LR
 UI action → invoke("note_update", payload)
   → Command handler: validate (pure fn, unit-tested)
   → send WriteRequest to DB writer (oneshot reply channel)
-  → DB writer: BEGIN; write row(s); write task_events (if task); reindex search; COMMIT
+  → DB writer: BEGIN; write row(s); write task_events (if task); COMMIT
   → DB writer publishes Event (e.g. NoteUpdated) on bus
   → UI forwarder emits to webviews → stores update → React re-renders
   → command returns the saved entity to caller
@@ -77,7 +75,7 @@ UI action → invoke("note_update", payload)
 
 ### 1.2 Read path
 
-Queries (`notes_list`, `search`, `today_view`) bypass the bus: command → read connection → result. Reads never block writes (WAL).
+Queries (`notes_list`, `tasks_query`, `today_view`) bypass the bus: command → read connection → result. Reads never block writes (WAL).
 
 ## 2. Process & Thread Model
 
@@ -123,7 +121,6 @@ All events are variants of one `Event` enum (`core/events.rs`), `serde`-serializ
 | `DataExported` | `path, bytes` | data service | UI toast |
 | `DataImported` | `counts` | data service | everything (full refresh) |
 | `AllDataDeleted` | — | data service | everything (reset to first run) |
-| `SearchIndexRebuilt` | `count, ms` | search service | UI |
 
 **Lag handling:** subscribers use `broadcast::Receiver`; on `RecvError::Lagged(n)` they log a warning and resync from DB (UI forwarder emits `ResyncRequired`; frontend refetches the current view).
 
@@ -160,17 +157,16 @@ All commands return `Result<T, AppError>`; `AppError` serializes to `{ code, mes
 ### 4.3 Meetings
 `meeting_create`, `meeting_update` (whole aggregate: participants, decisions, action items replaced atomically), `meeting_delete`, `meeting_get`, `meetings_list { participant?, from?, to? }`, `action_item_convert { action_item_id }` → `Task`, `participants_suggest { prefix }`.
 
-### 4.4 Today, Daily Log, Search
+### 4.4 Today, Daily Log
 | Command | Output |
 |---------|--------|
 | `today_view` | `{ date, greeting_part, yesterday_summary, planned, in_progress, overdue, pinned_notes, follow_ups }` |
 | `daily_log_get { date }` | `DailyLog` (live if today, snapshot otherwise; `null` if no log) |
 | `daily_logs_list { from, to }` | `{ date, completed, planned }[]` |
 | `daily_log_export_md { date, path }` | `()` |
-| `search { query, filters, sort, limit }` | `{ groups: { type, total, items: SearchHit[] }[] , ms }` |
 
 ### 4.5 Settings, Pet, Data, System
-`settings_get_all`, `setting_set { key, value }`, `prefs_get { key }`, `prefs_set { key, value }`, `pet_set_visible`, `data_export { path }`, `data_import { path }`, `data_delete_all { confirm: "DELETE" }`, `search_rebuild`, `app_info`, `app_ready { startup_ms }`, `diagnostics_snapshot` (dev builds only).
+`settings_get_all`, `setting_set { key, value }`, `prefs_get { key }`, `prefs_set { key, value }`, `pet_set_visible`, `data_export { path }`, `data_import { path }`, `data_delete_all { confirm: "DELETE" }`, `app_info`, `app_ready { startup_ms }`, `diagnostics_snapshot` (dev builds only).
 
 ## 5. Module Responsibilities
 
@@ -179,8 +175,7 @@ All commands return `Result<T, AppError>`; `AppError` serializes to `{ code, mes
 | `events` | `Event` enum, bus handle, subscription helpers | Contain business logic |
 | `commands` | Tauri command fns, input validation, mapping to services | Touch SQL directly |
 | `domain` | Pure types + rules: `Note`, `Task`, state machine, validation | Do I/O |
-| `db` | Connections, migrations (runner owns the transaction and `user_version`), repositories, write loop, search reindex | Publish events before commit; let a migration file open its own transaction |
-| `search` | Query parsing, FTS query building, ranking, `reindex(entity)` called inside the caller's write transaction (ADR-014) | Mutate source data; reindex outside the source transaction |
+| `db` | Connections, migrations (runner owns the transaction and `user_version`), repositories, write loop | Publish events before commit; let a migration file open its own transaction |
 | `daily_log` | Live computation, snapshot building, reconstruction, rollover handling | Depend on wall clock directly (uses `Clock` trait) |
 | `scheduler` | Next-midnight timer, wake/TZ hooks → `DayRolledOver` | Poll |
 | `settings` | Defaults, typed access, change events | Store secrets |
@@ -218,7 +213,7 @@ Frameless, transparent, `skipTaskbar`, `alwaysOnTop` per setting, `focus: false`
 
 ### 6.8 Export / import / delete-all
 - Export: take a read snapshot (single read transaction), stream JSON to file.
-- Import: validate JSON shape + `format_version` + `schema_version ≤ current`; refuse if workspace not empty; insert all in one transaction with FKs; rebuild search; publish `DataImported`.
+- Import: validate JSON shape + `format_version` + `schema_version ≤ current`; refuse if workspace not empty; insert all in one transaction with FKs; publish `DataImported`.
 - Delete-all: stop writer, close connections, delete `loaf.db*` files, recreate empty DB via migrations, clear settings, publish `AllDataDeleted`, frontend routes to first-run.
 
 ### 6.9 Errors & logging
@@ -259,9 +254,9 @@ Frameless, transparent, `skipTaskbar`, `alwaysOnTop` per setting, `focus: false`
 | ID (from 07) | Implemented in | Method |
 |--------------|---------------|--------|
 | V-1 macOS minimum | F0-01 | Build hello-world; run on oldest available macOS VM/hardware; record result |
-| V-2 RAM total | F0-12 | Sum private bytes of all Loaf processes idle 10 min, both OSes |
+| V-2 RAM total | **F0-02 (preliminary, CI runners)** then F0-12 (final) | Sum private bytes of all Loaf processes, both OSes. Preliminary: hello-world bundle on `windows-latest`/`macos-latest`, 2 min settle + 5 min sample. Final: the real app, 10 min idle |
 | V-3 Pet idle CPU/GPU | F0-12 | Static pet window visible, 10 min idle profile |
-| V-4 FTS5 at 5000 items | F0-12 | Seeded fixture, criterion bench, p95 |
+| ~~V-4 FTS5 at 5000 items~~ | withdrawn (ADR-017) | — |
 | V-5 Event bus burst | F0-12 | 10,000 events/s synthetic burst, assert no loss, UI frame time |
 
 ## 11. Traceability (PRD → TRD)
@@ -275,7 +270,7 @@ Frameless, transparent, `skipTaskbar`, `alwaysOnTop` per setting, `focus: false`
 | R1-01..R1-11 | §4.1, §6.3, §6.4 |
 | R1-20..R1-29 | §4.2, Schema §3.3–3.5 |
 | R1-30..R1-35 | §4.3 |
-| R1-50..R1-56 | §4.4, Schema §3.8 |
+| R1-50..R1-56 | removed (D2-A4) |
 | R1-60..R1-65 | §6.7 |
 | R1-81 | §6.5 |
 | NFR privacy | §7 |
@@ -293,3 +288,7 @@ No architecture changed; three clarifications so the TRD can't be read against t
 | §5 `search` | States that `reindex(entity)` runs **inside the caller's write transaction** per ADR-014, and must not run outside it — replacing any reading of ADR-006's trigger-based sync |
 
 §3's event catalog is unchanged: `SearchIndexRebuilt` already covered the manual and startup rebuild paths that ADR-014's guardrails require.
+
+### Amendment D3-A2 (2026-10-03) — search removed, V-2 measured early
+- **Search removed (ADR-017).** Dropped: the Search service node and its read-pool edge, FTS5 from the DB label, `reindex` from the write path and the `db` module row, the whole `search` module row, the `search` and `search_rebuild` commands, the `SearchIndexRebuilt` event, "rebuild search" from import, and the V-4 task. §12's D3-A1 rows about `search`/ADR-014 are now historical. `tasks_query` replaces `search` in the read-path example.
+- **V-2 moves earlier.** A preliminary RAM measurement of a hello-world bundle runs in the F0-02 CI on both OS runners; the final measurement stays in F0-12 (see plan D7-A1, ADR-018).

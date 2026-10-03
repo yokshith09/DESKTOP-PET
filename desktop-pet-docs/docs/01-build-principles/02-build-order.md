@@ -1,6 +1,6 @@
 # Build Order — Phases & Milestones
 
-> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **amended A-1, A-2, A-3, A-4 (2026-10-03)**. Changes require a written amendment at the bottom of this file.
+> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **amended A-1 … A-5 (2026-10-03)**. Changes require a written amendment at the bottom of this file.
 > This file is the **authority for phase numbering** (see Amendment A-2).
 
 This is the canonical sequence for building Loaf. Each phase is a complete, shippable increment.
@@ -47,7 +47,6 @@ This is the canonical sequence for building Loaf. Each phase is a complete, ship
 - Archive system
 - Pin system
 - Color system
-- Full-text search
 - Daily work log (auto-generated)
 - Task system (basic)
 - Meeting notes (basic)
@@ -75,12 +74,7 @@ Create/Edit
 ├── Color picker
 ├── Pin toggle
 ├── Archive toggle
-└── Save/Cancel
-
-Search
-├── Search input
-├── Results list (notes + tasks + meetings)
-└── Filter by type
+└── (no Save/Cancel — autosave; PRD R1-02)
 
 Daily Log
 ├── Today's planned tasks
@@ -98,9 +92,7 @@ Daily Log
 - [ ] Can pin/unpin
 - [ ] Can add/remove labels
 - [ ] Can change color
-- [ ] Can search across notes
 - [ ] Notes survive restart
-- [ ] Full-text search works (<500ms for 5000 items)
 - [ ] Daily log auto-generates and shows correct data
 - [ ] Can create tasks with title, due date, status
 - [ ] Can mark tasks complete
@@ -549,3 +541,7 @@ The product owner decided CI is built after MCP integration. Phase numbers 1–7
 | ADR-009 CI polling exception | Phase 4 | Phase 5.1 |
 
 Consequences: Phase 4 makes no network requests, so the zero-network firewall test still holds through it; no credential is needed before OAuth exists; the pasted-token UX is dropped. Phase 5.1 depends on Phase 5's GitHub OAuth, so a Phase 5 slip delays CI but nothing else. See ADR-016.
+
+### Amendment A-5 (2026-10-03) — search removed; editor sketch corrected
+- **Search removed (ADR-017).** Phase 1's "Full-text search" build item, the Search UI sketch, and the acceptance lines "Can search across notes" and "Full-text search works (<500ms for 5000 items)" are deleted. Everything else in Phase 1 is unchanged.
+- **Editor sketch corrected.** The Create/Edit sketch ended in "Save/Cancel", contradicting PRD R1-02 and UI brief principle 3 (autosave, no Save buttons). It now says so; the PRD and UI brief governed all along.

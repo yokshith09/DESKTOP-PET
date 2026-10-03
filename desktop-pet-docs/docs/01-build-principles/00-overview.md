@@ -18,7 +18,7 @@ This document set provides the operational playbook for building Loaf from found
 
 ## What This Means
 
-- **Phase 1** (Notes) should take 2–4 weeks and result in a complete, usable notes app
+- **Phase 1** (notes, tasks, meetings, daily log, minimal pet) is the first release; its size is tracked in the Implementation Plan in relative dev-days, not calendar time
 - **Phase 2** (Browser) should be independently useful; it doesn't depend on Phase 1 being perfect
 - **Each phase has UI, backend, tests, and documentation ready before code ships**
 - **Code review focuses on: Does this match the UI design? Are tests sufficient? Is it event-driven?**
@@ -63,3 +63,10 @@ Phase Complete When:
 ---
 
 Next: Read **01-core-principles.md** for decision-making rules.
+
+---
+
+## Amendments
+
+### Amendment A-1 (2026-10-03)
+"Phase 1 (Notes) should take 2–4 weeks" was a leftover from before Amendment A-1 of `02-build-order.md` removed calendar durations, and it understated Phase 1's scope (it ships tasks, meetings, the daily log and a minimal pet, not only notes). Replaced with a pointer to the Implementation Plan. No principle changed.
