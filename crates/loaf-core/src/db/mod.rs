@@ -3,6 +3,7 @@
 //! This module opens and migrates the database. The single writer thread and the read pool
 //! build on it (F0-05).
 
+pub mod handle;
 pub mod migrate;
 
 use std::path::{Path, PathBuf};
@@ -11,6 +12,7 @@ use std::time::Duration;
 use rusqlite::Connection;
 
 use crate::error::{AppError, Result};
+pub use handle::Database;
 pub use migrate::{Migration, MIGRATIONS};
 
 /// Open `path` and set the PRAGMAs every Loaf connection needs (Schema §1).
