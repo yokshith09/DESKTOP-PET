@@ -4,10 +4,12 @@
 //! run on any machine. `scripts/check-core-no-tauri.mjs` enforces that in CI.
 
 pub mod bus;
+pub mod clock;
 pub mod db;
 pub mod error;
 pub mod events;
 pub mod logging;
+pub mod scheduler;
 
 /// The version of the core, taken from the workspace package version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
