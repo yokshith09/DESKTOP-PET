@@ -267,22 +267,47 @@ fn clean_project(project: Option<&str>) -> Result<Option<String>> {
 
 // ---- storage -------------------------------------------------------------------------------
 
-type Row = (
-    String,
-    String,
-    String,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    i64,
-    i64,
-    Option<i64>,
-    Option<i64>,
-    Option<i64>,
-);
+const COLUMNS: &str = "id, title, description, status, priority, project, planned_date, due_date, note_id, source_action_item_id,
+                       created_at, updated_at, started_at, completed_at, cancelled_at";
+
+/// One `tasks` row as stored, before the text columns are parsed into types.
+struct Raw {
+    id: String,
+    title: String,
+    description: String,
+    status: String,
+    priority: Option<String>,
+    project: Option<String>,
+    planned: Option<String>,
+    due: Option<String>,
+    note_id: Option<String>,
+    source: Option<String>,
+    created_at: i64,
+    updated_at: i64,
+    started_at: Option<i64>,
+    completed_at: Option<i64>,
+    cancelled_at: Option<i64>,
+}
+
+fn read_raw(r: &rusqlite::Row) -> rusqlite::Result<Raw> {
+    Ok(Raw {
+        id: r.get(0)?,
+        title: r.get(1)?,
+        description: r.get(2)?,
+        status: r.get(3)?,
+        priority: r.get(4)?,
+        project: r.get(5)?,
+        planned: r.get(6)?,
+        due: r.get(7)?,
+        note_id: r.get(8)?,
+        source: r.get(9)?,
+        created_at: r.get(10)?,
+        updated_at: r.get(11)?,
+        started_at: r.get(12)?,
+        completed_at: r.get(13)?,
+        cancelled_at: r.get(14)?,
+    })
+}
 
 fn parse_date(s: Option<String>) -> Result<Option<NaiveDate>> {
     s.map(|s| {
@@ -292,54 +317,35 @@ fn parse_date(s: Option<String>) -> Result<Option<NaiveDate>> {
     .transpose()
 }
 
+fn build(raw: Raw) -> Result<Task> {
+    Ok(Task {
+        id: raw.id,
+        title: raw.title,
+        description: raw.description,
+        status: TaskStatus::from_db(&raw.status)?,
+        priority: raw.priority.as_deref().map(Priority::from_db).transpose()?,
+        project: raw.project,
+        planned_date: parse_date(raw.planned)?,
+        due_date: parse_date(raw.due)?,
+        note_id: raw.note_id,
+        source_action_item_id: raw.source,
+        created_at: raw.created_at,
+        updated_at: raw.updated_at,
+        started_at: raw.started_at,
+        completed_at: raw.completed_at,
+        cancelled_at: raw.cancelled_at,
+    })
+}
+
 fn load(conn: &Connection, id: &str) -> Result<Task> {
-    let row: Option<Row> = conn
+    let raw = conn
         .query_row(
-            "SELECT title, description, status, priority, project, planned_date, due_date, note_id, source_action_item_id,
-                    created_at, updated_at, started_at, completed_at, cancelled_at
-               FROM tasks WHERE id = ?1",
+            &format!("SELECT {COLUMNS} FROM tasks WHERE id = ?1"),
             [id],
-            |r| {
-                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?, r.get(8)?, r.get(9)?, r.get(10)?, r.get(11)?, r.get(12)?, r.get(13)?))
-            },
+            read_raw,
         )
         .optional()?;
-    let Some((
-        title,
-        description,
-        status,
-        priority,
-        project,
-        planned,
-        due,
-        note_id,
-        source,
-        created_at,
-        updated_at,
-        started_at,
-        completed_at,
-        cancelled_at,
-    )) = row
-    else {
-        return Err(not_found());
-    };
-    Ok(Task {
-        id: id.to_owned(),
-        title,
-        description,
-        status: TaskStatus::from_db(&status)?,
-        priority: priority.as_deref().map(Priority::from_db).transpose()?,
-        project,
-        planned_date: parse_date(planned)?,
-        due_date: parse_date(due)?,
-        note_id,
-        source_action_item_id: source,
-        created_at,
-        updated_at,
-        started_at,
-        completed_at,
-        cancelled_at,
-    })
+    build(raw.ok_or_else(not_found)?)
 }
 
 fn not_found() -> AppError {
@@ -603,6 +609,140 @@ pub async fn delete(db: &Database, clock: &dyn Clock, id: &str) -> Result<()> {
         }
         tx.execute("DELETE FROM tasks WHERE id = ?1", [&id])?;
         Ok(((), vec![Event::TaskDeleted { at: now, id }]))
+    })
+    .await
+}
+
+// ---- views (R1-27) -------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskView {
+    /// Open tasks planned today, plus anything overdue, plus anything in progress.
+    Today,
+    /// Open tasks planned for tomorrow through the next 7 days.
+    Upcoming,
+    Pending,
+    /// Every task, finished ones last.
+    All,
+    /// Completed tasks, newest first (the history).
+    Completed,
+}
+
+/// `priority` and `project` narrow every view. `status` and the date range apply where they make
+/// sense: `status` and a *planned*-date range in `All`, a *completion*-date range in `Completed`.
+/// Dates are inclusive local days.
+#[derive(Debug, Clone, Default)]
+pub struct TaskFilters {
+    pub status: Option<TaskStatus>,
+    pub priority: Option<Priority>,
+    pub project: Option<String>,
+    pub from: Option<NaiveDate>,
+    pub to: Option<NaiveDate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskRow {
+    pub task: Task,
+    pub overdue: bool,
+}
+
+const PRIORITY_RANK: &str =
+    "CASE priority WHEN 'HIGH' THEN 0 WHEN 'MEDIUM' THEN 1 WHEN 'LOW' THEN 2 ELSE 3 END";
+const OPEN: &str = "status NOT IN ('COMPLETED', 'CANCELLED')";
+
+pub async fn query(
+    db: &Database,
+    clock: &dyn Clock,
+    view: TaskView,
+    filters: TaskFilters,
+) -> Result<Vec<TaskRow>> {
+    use rusqlite::types::Value;
+
+    let today = clock.today();
+    let (today_text, horizon) = (
+        today.to_string(),
+        (today + chrono::Days::new(7)).to_string(),
+    );
+    // Completion times are instants, so the inclusive local-day range becomes [start of `from`, start of the day after `to`).
+    let done_from = filters
+        .from
+        .map(|d| crate::clock::start_of_day_ms(clock, d));
+    let done_before = filters
+        .to
+        .map(|d| crate::clock::start_of_day_ms(clock, d.succ_opt().unwrap_or(d)));
+
+    db.read(move |conn| {
+        let mut clauses: Vec<String> = Vec::new();
+        let mut args: Vec<Value> = Vec::new();
+        let mut order_args: Vec<Value> = Vec::new();
+
+        let order = match view {
+            TaskView::Today => {
+                clauses.push(format!("{OPEN} AND (planned_date = ? OR (due_date IS NOT NULL AND due_date < ?) OR status = 'IN_PROGRESS')"));
+                args.extend([today_text.clone().into(), today_text.clone().into()]);
+                order_args.push(today_text.clone().into());
+                format!("CASE WHEN status = 'IN_PROGRESS' THEN 0 WHEN due_date IS NOT NULL AND due_date < ? THEN 1 ELSE 2 END, {PRIORITY_RANK}, due_date IS NULL, due_date, created_at")
+            }
+            TaskView::Upcoming => {
+                clauses.push(format!("{OPEN} AND planned_date > ? AND planned_date <= ?"));
+                args.extend([today_text.clone().into(), horizon.clone().into()]);
+                format!("planned_date, {PRIORITY_RANK}, created_at")
+            }
+            TaskView::Pending => {
+                clauses.push("status = 'PENDING'".into());
+                "updated_at DESC, created_at DESC".to_owned()
+            }
+            TaskView::Completed => {
+                clauses.push("status = 'COMPLETED'".into());
+                if let Some(from) = done_from {
+                    clauses.push("completed_at >= ?".into());
+                    args.push(from.into());
+                }
+                if let Some(before) = done_before {
+                    clauses.push("completed_at < ?".into());
+                    args.push(before.into());
+                }
+                "completed_at DESC".to_owned()
+            }
+            TaskView::All => {
+                if let Some(status) = filters.status {
+                    clauses.push("status = ?".into());
+                    args.push(status.as_str().to_owned().into());
+                }
+                if let Some(from) = filters.from {
+                    clauses.push("planned_date >= ?".into());
+                    args.push(from.to_string().into());
+                }
+                if let Some(to) = filters.to {
+                    clauses.push("planned_date <= ?".into());
+                    args.push(to.to_string().into());
+                }
+                format!("CASE WHEN status IN ('COMPLETED', 'CANCELLED') THEN 1 ELSE 0 END, {PRIORITY_RANK}, planned_date IS NULL, planned_date, created_at DESC")
+            }
+        };
+        if let Some(priority) = filters.priority {
+            clauses.push("priority = ?".into());
+            args.push(priority.as_str().to_owned().into());
+        }
+        if let Some(project) = &filters.project {
+            clauses.push("lower(project) = lower(?)".into());
+            args.push(project.trim().to_owned().into());
+        }
+        args.extend(order_args);
+
+        let where_sql = if clauses.is_empty() { String::new() } else { format!("WHERE {}", clauses.join(" AND ")) };
+        // Every fragment above is a constant or a `?` placeholder; user values only ever travel in `args`.
+        let sql = format!("SELECT {COLUMNS} FROM tasks {where_sql} ORDER BY {order}");
+        let mut stmt = conn.prepare(&sql)?;
+        let raws = stmt.query_map(rusqlite::params_from_iter(args), read_raw)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        raws.into_iter()
+            .map(|raw| {
+                let task = build(raw)?;
+                let overdue = task.is_overdue(today);
+                Ok(TaskRow { task, overdue })
+            })
+            .collect()
     })
     .await
 }
@@ -1408,5 +1548,429 @@ mod tests {
         assert!(!t.is_overdue(today), "due today is not overdue yet");
         t.due_date = None;
         assert!(!t.is_overdue(today));
+    }
+
+    // ---- views (R1-27) -----------------------------------------------------------------------
+
+    struct Seed<'a> {
+        f: &'a Fixture,
+    }
+
+    impl Seed<'_> {
+        /// Create a task, then move it to `status` if it isn't PLANNED.
+        async fn task(
+            &self,
+            title: &str,
+            planned: Option<NaiveDate>,
+            due: Option<NaiveDate>,
+            priority: Option<Priority>,
+            status: TaskStatus,
+        ) -> Task {
+            self.f.clock.advance_ms(10);
+            let t = create(
+                &self.f.db,
+                &self.f.clock,
+                TaskInput {
+                    planned_date: planned,
+                    due_date: due,
+                    priority,
+                    ..titled(title)
+                },
+            )
+            .await
+            .unwrap();
+            match status {
+                Planned => t,
+                InProgress | Completed | Cancelled => {
+                    transition(&self.f.db, &self.f.clock, &t.id, status)
+                        .await
+                        .unwrap()
+                }
+                Pending => {
+                    transition(&self.f.db, &self.f.clock, &t.id, InProgress)
+                        .await
+                        .unwrap();
+                    transition(&self.f.db, &self.f.clock, &t.id, Pending)
+                        .await
+                        .unwrap()
+                }
+            }
+        }
+    }
+
+    async fn names(f: &Fixture, view: TaskView, filters: TaskFilters) -> Vec<String> {
+        query(&f.db, &f.clock, view, filters)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.task.title)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn today_shows_in_progress_then_overdue_then_planned_today_and_nothing_finished_or_future(
+    ) {
+        let f = setup(); // today is 2026-10-03
+        let s = Seed { f: &f };
+        s.task("A planned today", Some(d(2026, 10, 3)), None, None, Planned)
+            .await;
+        s.task(
+            "B planned today HIGH",
+            Some(d(2026, 10, 3)),
+            None,
+            Some(Priority::High),
+            Planned,
+        )
+        .await;
+        s.task(
+            "C in progress MEDIUM",
+            Some(d(2026, 9, 30)),
+            None,
+            Some(Priority::Medium),
+            InProgress,
+        )
+        .await;
+        s.task(
+            "D planned next week",
+            Some(d(2026, 10, 10)),
+            None,
+            None,
+            Planned,
+        )
+        .await;
+        s.task(
+            "E overdue",
+            Some(d(2026, 9, 28)),
+            Some(d(2026, 10, 1)),
+            None,
+            Planned,
+        )
+        .await;
+        s.task(
+            "F completed today",
+            Some(d(2026, 10, 3)),
+            None,
+            None,
+            Completed,
+        )
+        .await;
+        s.task(
+            "G cancelled today",
+            Some(d(2026, 10, 3)),
+            None,
+            None,
+            Cancelled,
+        )
+        .await;
+        s.task("H pending today", Some(d(2026, 10, 3)), None, None, Pending)
+            .await;
+        s.task(
+            "I overdue and in progress HIGH",
+            None,
+            Some(d(2026, 10, 2)),
+            Some(Priority::High),
+            InProgress,
+        )
+        .await;
+        s.task("J no plan, no date", None, None, None, Planned)
+            .await;
+
+        let rows = query(&f.db, &f.clock, TaskView::Today, TaskFilters::default())
+            .await
+            .unwrap();
+        let order: Vec<_> = rows
+            .iter()
+            .map(|r| r.task.title.chars().next().unwrap())
+            .collect();
+        assert_eq!(
+            order,
+            ['I', 'C', 'E', 'B', 'A', 'H'],
+            "in progress (by priority), overdue, then planned today (by priority, then age)"
+        );
+        let overdue: Vec<_> = rows
+            .iter()
+            .filter(|r| r.overdue)
+            .map(|r| r.task.title.chars().next().unwrap())
+            .collect();
+        assert_eq!(overdue, ['I', 'E']);
+    }
+
+    #[tokio::test]
+    async fn upcoming_is_tomorrow_through_seven_days_ahead_inclusive() {
+        let f = setup();
+        let s = Seed { f: &f };
+        s.task("today", Some(d(2026, 10, 3)), None, None, Planned)
+            .await;
+        s.task(
+            "tomorrow low",
+            Some(d(2026, 10, 4)),
+            None,
+            Some(Priority::Low),
+            Planned,
+        )
+        .await;
+        s.task(
+            "tomorrow high",
+            Some(d(2026, 10, 4)),
+            None,
+            Some(Priority::High),
+            Planned,
+        )
+        .await;
+        s.task("day 7", Some(d(2026, 10, 10)), None, None, Planned)
+            .await;
+        s.task("day 8", Some(d(2026, 10, 11)), None, None, Planned)
+            .await;
+        s.task("yesterday", Some(d(2026, 10, 2)), None, None, Planned)
+            .await;
+        s.task(
+            "finished tomorrow",
+            Some(d(2026, 10, 5)),
+            None,
+            None,
+            Completed,
+        )
+        .await;
+        s.task("unplanned", None, None, None, Planned).await;
+        assert_eq!(
+            names(&f, TaskView::Upcoming, TaskFilters::default()).await,
+            ["tomorrow high", "tomorrow low", "day 7"]
+        );
+    }
+
+    #[tokio::test]
+    async fn pending_lists_only_paused_tasks_most_recently_paused_first() {
+        let f = setup();
+        let s = Seed { f: &f };
+        s.task("first paused", None, None, None, Pending).await;
+        s.task("running", None, None, None, InProgress).await;
+        s.task("second paused", None, None, None, Pending).await;
+        assert_eq!(
+            names(&f, TaskView::Pending, TaskFilters::default()).await,
+            ["second paused", "first paused"]
+        );
+    }
+
+    #[tokio::test]
+    async fn completed_is_a_history_newest_first_and_the_date_range_uses_local_days() {
+        let f = setup();
+        let s = Seed { f: &f };
+        for (title, day) in [("done 1st", 1), ("done 2nd", 2), ("done 3rd", 3)] {
+            f.clock.set_now_ms(
+                chrono::TimeZone::with_ymd_and_hms(&chrono::Utc, 2026, 10, day, 12, 0, 0)
+                    .unwrap()
+                    .timestamp_millis(),
+            );
+            s.task(title, None, None, None, Completed).await;
+        }
+        s.task("cancelled is not history", None, None, None, Cancelled)
+            .await;
+        assert_eq!(
+            names(&f, TaskView::Completed, TaskFilters::default()).await,
+            ["done 3rd", "done 2nd", "done 1st"]
+        );
+        let only_second = TaskFilters {
+            from: Some(d(2026, 10, 2)),
+            to: Some(d(2026, 10, 2)),
+            ..Default::default()
+        };
+        assert_eq!(
+            names(&f, TaskView::Completed, only_second).await,
+            ["done 2nd"],
+            "a one-day range is inclusive"
+        );
+        let from_second = TaskFilters {
+            from: Some(d(2026, 10, 2)),
+            ..Default::default()
+        };
+        assert_eq!(
+            names(&f, TaskView::Completed, from_second).await,
+            ["done 3rd", "done 2nd"]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_completion_just_after_midnight_utc_still_belongs_to_the_previous_local_day() {
+        let f = setup();
+        f.clock.set_tz(chrono_tz::America::Los_Angeles);
+        // 02:00 UTC on Oct 3 is 19:00 on Oct 2 in Los Angeles.
+        f.clock.set_now_ms(
+            chrono::TimeZone::with_ymd_and_hms(&chrono::Utc, 2026, 10, 3, 2, 0, 0)
+                .unwrap()
+                .timestamp_millis(),
+        );
+        Seed { f: &f }
+            .task("evening job", None, None, None, Completed)
+            .await;
+        let on = |day| TaskFilters {
+            from: Some(d(2026, 10, day)),
+            to: Some(d(2026, 10, day)),
+            ..Default::default()
+        };
+        assert_eq!(names(&f, TaskView::Completed, on(2)).await, ["evening job"]);
+        assert!(names(&f, TaskView::Completed, on(3)).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn all_shows_every_status_with_finished_tasks_last_and_filters_combine() {
+        let f = setup();
+        let s = Seed { f: &f };
+        s.task(
+            "done",
+            Some(d(2026, 10, 1)),
+            None,
+            Some(Priority::High),
+            Completed,
+        )
+        .await;
+        s.task(
+            "low planned",
+            Some(d(2026, 10, 2)),
+            None,
+            Some(Priority::Low),
+            Planned,
+        )
+        .await;
+        s.task(
+            "high planned",
+            Some(d(2026, 10, 9)),
+            None,
+            Some(Priority::High),
+            Planned,
+        )
+        .await;
+        s.task("unplanned", None, None, None, Planned).await;
+        s.task("cancelled", None, None, None, Cancelled).await;
+        assert_eq!(
+            names(&f, TaskView::All, TaskFilters::default()).await,
+            [
+                "high planned",
+                "low planned",
+                "unplanned",
+                "done",
+                "cancelled"
+            ]
+        );
+        assert_eq!(
+            names(
+                &f,
+                TaskView::All,
+                TaskFilters {
+                    status: Some(Cancelled),
+                    ..Default::default()
+                }
+            )
+            .await,
+            ["cancelled"]
+        );
+        assert_eq!(
+            names(
+                &f,
+                TaskView::All,
+                TaskFilters {
+                    priority: Some(Priority::High),
+                    ..Default::default()
+                }
+            )
+            .await,
+            ["high planned", "done"]
+        );
+        let range = TaskFilters {
+            from: Some(d(2026, 10, 2)),
+            to: Some(d(2026, 10, 9)),
+            ..Default::default()
+        };
+        assert_eq!(
+            names(&f, TaskView::All, range.clone()).await,
+            ["high planned", "low planned"],
+            "planned-date range, inclusive"
+        );
+        let both = TaskFilters {
+            priority: Some(Priority::Low),
+            ..range
+        };
+        assert_eq!(
+            names(&f, TaskView::All, both).await,
+            ["low planned"],
+            "filters are ANDed"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_project_filter_ignores_case_and_surrounding_spaces() {
+        let f = setup();
+        for (title, project) in [("a", "Loaf"), ("b", "loaf"), ("c", "Other")] {
+            create(
+                &f.db,
+                &f.clock,
+                TaskInput {
+                    project: Some(project.into()),
+                    planned_date: Some(f.clock.today()),
+                    ..titled(title)
+                },
+            )
+            .await
+            .unwrap();
+        }
+        let loaf = TaskFilters {
+            project: Some("  LOAF ".into()),
+            ..Default::default()
+        };
+        assert_eq!(names(&f, TaskView::Today, loaf.clone()).await.len(), 2);
+        assert_eq!(names(&f, TaskView::All, loaf).await.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn the_priority_filter_narrows_the_today_view_too() {
+        let f = setup();
+        let s = Seed { f: &f };
+        s.task(
+            "high",
+            Some(d(2026, 10, 3)),
+            None,
+            Some(Priority::High),
+            Planned,
+        )
+        .await;
+        s.task(
+            "low",
+            Some(d(2026, 10, 3)),
+            None,
+            Some(Priority::Low),
+            Planned,
+        )
+        .await;
+        assert_eq!(
+            names(
+                &f,
+                TaskView::Today,
+                TaskFilters {
+                    priority: Some(Priority::High),
+                    ..Default::default()
+                }
+            )
+            .await,
+            ["high"]
+        );
+    }
+
+    #[tokio::test]
+    async fn every_view_of_an_empty_workspace_is_just_empty() {
+        let f = setup();
+        for view in [
+            TaskView::Today,
+            TaskView::Upcoming,
+            TaskView::Pending,
+            TaskView::All,
+            TaskView::Completed,
+        ] {
+            assert!(
+                query(&f.db, &f.clock, view, TaskFilters::default())
+                    .await
+                    .unwrap()
+                    .is_empty(),
+                "{view:?}"
+            );
+        }
     }
 }

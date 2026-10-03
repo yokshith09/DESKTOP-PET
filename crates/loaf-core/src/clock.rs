@@ -134,6 +134,12 @@ pub fn next_local_midnight_ms(clock: &dyn Clock) -> i64 {
     first_instant_of(tz, tomorrow)
 }
 
+/// The instant the local day `date` begins, in ms (UTC). See [`next_local_midnight_ms`] for the
+/// awkward cases (a skipped or repeated midnight).
+pub fn start_of_day_ms(clock: &dyn Clock, date: NaiveDate) -> i64 {
+    first_instant_of(clock.tz(), date)
+}
+
 fn first_instant_of(tz: Tz, date: NaiveDate) -> i64 {
     let midnight = date.and_time(NaiveTime::MIN);
     // Step forward in half-hour increments until a local time exists (a DST gap is at most a few hours).
