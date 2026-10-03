@@ -1,0 +1,60 @@
+name: V-2 RAM (preliminary)
+
+# F0-02 / ADR-018. Informational: it reports a number for a human decision (plan §3 decision
+# point 1) and fails only when a run cannot be measured. It runs when the shell, the frontend or
+# the measuring scripts change — not on core-library commits — and is never cancelled by them.
+on:
+  pull_request:
+    paths:
+      - "src-tauri/**"
+      - "src/**"
+      - "*.html"
+      - "vite.config.ts"
+      - "scripts/ram/**"
+      - ".github/workflows/v2-ram.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: v2-ram-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  v2-ram:
+    name: v2-ram (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            build: pnpm tauri build --no-bundle
+            exe: target/release/loaf.exe
+          - os: macos-latest
+            build: pnpm tauri build --bundles app
+            exe: target/release/bundle/macos/Loaf.app/Contents/MacOS/loaf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: pnpm install --frozen-lockfile
+      - name: Build the hello-world release bundle
+        run: ${{ matrix.build }}
+      - name: Measure total RAM of all Loaf processes (2 min settle, 5 min sampling)
+        run: node scripts/ram/measure.mjs --exe "${{ matrix.exe }}" --settle 120 --duration 300 --interval 30 --out ram-report
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v2-ram-${{ matrix.os }}
+          path: ram-report.*
+          if-no-files-found: warn
