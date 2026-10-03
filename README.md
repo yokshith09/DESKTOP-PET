@@ -2,6 +2,8 @@
 
 A lightweight, local-first desktop companion for Windows and macOS: notes, tasks, meetings and an automatic daily work log, with a desktop pet.
 
+**Progress:** see the [Roadmap](desktop-pet-docs/ROADMAP.md) — principles → phases → milestones → features.
+
 **Status:** CP1 Foundation in progress. All documentation (D0–D7) is locked — start at [`desktop-pet-docs/README.md`](desktop-pet-docs/README.md). Feature specs are in [`desktop-pet-docs/docs/features/`](desktop-pet-docs/docs/features/README.md).
 
 ## Layout

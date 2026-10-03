@@ -2,6 +2,8 @@
 
 A lightweight, local-first desktop companion for Windows and macOS: notes, tasks, meetings and an automatic daily work log, with a desktop pet that lives alongside your work.
 
+**Where things stand:** [`ROADMAP.md`](ROADMAP.md) — build principles → phases → milestones → features. Start there.
+
 **Status:** 🔒 **D0–D7 locked** (2026-10-03) → next: **CP1 Foundation** (`F0-01` Tauri scaffold). No application code exists yet.
 
 ## Non-negotiables
