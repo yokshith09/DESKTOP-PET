@@ -1,6 +1,6 @@
 # Architecture Decisions — ADR Log
 
-> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **ADR-014, ADR-015 appended 2026-10-03**. Existing ADRs change only via a new ADR that supersedes them. New ADRs may be appended at any time.
+> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **ADR-014, ADR-015, ADR-016 appended 2026-10-03**. Existing ADRs change only via a new ADR that supersedes them. New ADRs may be appended at any time.
 
 Each decision records **what we chose, why, what we rejected, and what it costs**. Confidence tags: [Certain] verified fact, [Likely] strong inference, [Guessing] must be verified in Phase 0.
 
@@ -87,7 +87,7 @@ Each decision records **what we chose, why, what we rejected, and what it costs*
 
 | Exception | Why no event exists | Constraint |
 |-----------|--------------------|------------|
-| CI status (Phase 4) | A desktop app cannot receive GitHub webhooks without a public endpoint | Only while a build is known to be running; exponential backoff 15 s → 5 min; stop when finished |
+| CI status (Phase 5.1) | A desktop app cannot receive GitHub webhooks without a public endpoint | Only while a build is known to be running; exponential backoff 15 s → 5 min; stop when finished |
 | MCP integration refresh (Phase 5) | Remote services may not push to a local client | User-configurable interval, default ≥15 min, paused when idle or on battery |
 
 Any new exception requires a new ADR.
@@ -101,7 +101,7 @@ Any new exception requires a new ADR.
 
 ## ADR-011: Secrets in the OS keychain, never in SQLite
 
-**Decision:** OAuth tokens and API credentials (Phase 4+: the Phase 4 CI access token, then Phase 5 OAuth) are stored via Windows Credential Manager / macOS Keychain (e.g., `keyring` crate). SQLite stores only a reference.
+**Decision:** OAuth tokens and API credentials (Phase 5+, per ADR-016) are stored via Windows Credential Manager / macOS Keychain (e.g., `keyring` crate). SQLite stores only a reference.
 **Why:** Data export must never leak tokens; DB file can be shared for debugging safely.
 
 ## ADR-012: Data ownership — export, delete, no telemetry
@@ -134,7 +134,7 @@ Any new exception requires a new ADR.
 
 ## ADR-015: Phase order revised — Developer → MCP → Voice
 
-**Status:** Accepted (2026-10-03) · **Supersedes the phase numbers** in ADR-009 and ADR-011; their decisions are unchanged.
+**Status:** Accepted (2026-10-03) · **Supersedes the phase numbers** in ADR-009 and ADR-011; their decisions are unchanged. **The CI/credential clauses below are superseded by ADR-016.**
 
 **Decision:** Post-v1 phase order is 2 Browser · 3 Pet · **4 Developer · 5 MCP · 6 Voice** · 7 Characters. ADR-009's polling exceptions are now *CI status — Phase 4* and *MCP refresh — Phase 5*. ADR-011's keychain is first used in Phase 4 (CI access token) and again in Phase 5 (OAuth tokens).
 
@@ -145,6 +145,22 @@ Any new exception requires a new ADR.
 **Cost / Risk:** Phase 4 needs credentials before the OAuth flow exists, so it takes a pasted token (a worse UX than OAuth, but private-repo CI is the only case that needs one). Phase 5 absorbs the MCP scaffold and OAuth and is the largest post-v1 phase.
 
 **Verification:** Phase 4 acceptance includes "token never in SQLite or export"; Phase 5 re-sizes its feature list before it starts.
+
+---
+
+## ADR-016: CI status built after MCP (Phase 5.1)
+
+**Status:** Accepted (2026-10-03) · **Supersedes** ADR-015's placement of CI status in Phase 4 and its pasted-token credential clause. The phase order itself (Developer 4 · MCP 5 · Voice 6) stands.
+
+**Decision:** Phase 4 Developer Companion is local only (git + build). CI status checks, CI reactions and CI-failure task suggestions become **Phase 5.1**, shipping after MCP and before Voice. ADR-009's CI polling exception moves to Phase 5.1. CI authenticates through the Phase 5 GitHub OAuth login; no pasted tokens. ADR-011's keychain is first used in Phase 5.
+
+**Why:** Product-owner decision. It removes the only network call and the only credential from Phase 4, and gives CI a better credential (OAuth) than a pasted token.
+
+**Rejected:** Keeping CI in Phase 4 with a pasted token (worse UX, and a credential before the OAuth/keychain work exists). Moving CI after Voice (nothing in Voice needs it, and 5.1 reuses Phase 5 while it is fresh).
+
+**Cost / Risk:** Developer Companion is incomplete until 5.1: CI pass/fail reactions, deployment events and CI-failure notifications are missing in Phase 4. Phase 5.1 depends on Phase 5's GitHub login. ADR-009's Jenkins support has no OAuth path, so Jenkins stays conditional on the 5.1 start-of-phase estimate.
+
+**Verification:** Phase 4 acceptance includes a zero-network firewall test; Phase 5.1 acceptance includes "no token in SQLite or export".
 
 ---
 

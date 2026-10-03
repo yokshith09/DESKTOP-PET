@@ -234,7 +234,7 @@ Frameless, transparent, `skipTaskbar`, `alwaysOnTop` per setting, `focus: false`
 | Webview hardening | Tauri v2 capabilities per window: pet window gets only `pet_*`, `prefs_set`, `settings_get_all` |
 | Content safety | Markdown HTML disabled; no `dangerouslySetInnerHTML` except the sanitized Markdown renderer output |
 | File access | Only app-data dir + user-chosen export/import paths via OS dialog |
-| Secrets | None in Phase 0–1. Keychain introduced in Phase 4 for the CI access token, reused for OAuth in Phase 5 (ADR-011, ADR-015) |
+| Secrets | None in Phase 0–1. Keychain introduced in Phase 5 for OAuth tokens; Phase 5.1 CI reuses them (ADR-011, ADR-016) |
 
 ## 8. Frontend Architecture
 

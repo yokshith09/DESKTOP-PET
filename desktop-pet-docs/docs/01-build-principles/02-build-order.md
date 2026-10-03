@@ -1,6 +1,6 @@
 # Build Order — Phases & Milestones
 
-> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **amended A-1, A-2, A-3 (2026-10-03)**. Changes require a written amendment at the bottom of this file.
+> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **amended A-1, A-2, A-3, A-4 (2026-10-03)**. Changes require a written amendment at the bottom of this file.
 > This file is the **authority for phase numbering** (see Amendment A-2).
 
 This is the canonical sequence for building Loaf. Each phase is a complete, shippable increment.
@@ -220,23 +220,22 @@ Privacy Radar
 
 ## Phase 4: Developer Companion
 
-**Goal:** Add git, build, and CI awareness.
+**Goal:** Add local git and build awareness. Phase 4 is fully local — no network, no credentials. CI status arrives in Phase 5.1.
 
 **What's built:**
 - Git repository watcher
 - Commit detection
-- Build system monitoring
-- CI status checks (GitHub Actions, Jenkins) — a **documented polling exception** with backoff, see 07 ADR-009
-- CI credentials: a user-provided access token stored in the OS keychain (ADR-011). No OAuth flow in this phase — OAuth arrives with Phase 5
+- Local build system monitoring
 - Pet reactions to git/build events
-- Build failure notifications
-- Suggested task creation on build failure
+- Build failure notifications (from the local build)
+- Suggested task creation on local build failure
 - All tests
 
 **What's NOT built:**
+- CI status checks (GitHub Actions, Jenkins) — Phase 5.1
+- CI pass/fail pet reactions and CI-failure notifications — Phase 5.1
+- Deployment events — with CI in Phase 5.1
 - Automatic task creation (requires user confirmation)
-- Advanced CI integration (only GitHub Actions, Jenkins in v1)
-- OAuth login (Phase 5)
 - Code analysis
 - Performance metrics
 
@@ -245,13 +244,12 @@ Privacy Radar
 - [ ] Pet reacts to git push (celebration)
 - [ ] Can detect build start/complete
 - [ ] Pet shows build state (working, success, failure)
-- [ ] Can check CI status (public repos with no token; private repos with a keychain-stored token)
-- [ ] Token never written to SQLite or included in data export
-- [ ] Notifications on CI failure
+- [ ] Notification on local build failure
 - [ ] User can create task from build failure
+- [ ] Zero network requests (firewall test)
 - [ ] Test coverage >80%
 
-**Ship:** Yes. Developers now have workspace awareness + git/CI reactions.
+**Ship:** Yes. Developers now have workspace awareness + git/build reactions.
 
 ---
 
@@ -276,6 +274,7 @@ Privacy Radar
 - Write-back to external services (v1 is read-only)
 - Real-time sync (event-driven only)
 - Advanced filtering
+- CI status (Phase 5.1, built on this phase's GitHub login)
 - Voice (Phase 6)
 
 **Acceptance Criteria:**
@@ -292,6 +291,37 @@ Privacy Radar
 - [ ] Test coverage >80%
 
 **Ship:** Yes. Loaf now connects to the tools developers use daily.
+
+---
+
+## Phase 5.1: CI Status
+
+**Goal:** Show CI results and react to them, now that OAuth and the MCP client exist. Ships after Phase 5 and before Voice; it is an increment, not a renumbering.
+
+**What's built:**
+- CI status checks (GitHub Actions first; Jenkins if it fits the start-of-phase estimate) — a **documented polling exception** with backoff, see 07 ADR-009
+- Authentication through the Phase 5 GitHub OAuth login and keychain-held tokens (ADR-011) — no pasted tokens
+- CI passed / CI failed pet reactions
+- CI failure notifications
+- Suggested task creation on CI failure
+- Deployment started/completed events if the CI provider exposes them
+- All tests
+
+**What's NOT built:**
+- Automatic task creation (requires user confirmation)
+- Providers beyond GitHub Actions and Jenkins
+- Write-back to CI (re-run, cancel)
+
+**Acceptance Criteria:**
+- [ ] Can read CI status for a watched repo through the Phase 5 GitHub login
+- [ ] Polls only while a build is known to be running; exponential backoff 15 s → 5 min; stops when finished (ADR-009)
+- [ ] Pet reacts to CI passed and CI failed
+- [ ] Notification on CI failure
+- [ ] User can create a task from a CI failure
+- [ ] No token in SQLite or in a data export
+- [ ] Test coverage >80%
+
+**Ship:** Yes. Developer Companion is now complete.
 
 ---
 
@@ -374,7 +404,7 @@ Some work happens in parallel:
 | **Design System** | 0–7 | Before UI in each phase |
 | **Testing Infrastructure** | 0–7 | Before code in each phase |
 | **Performance Profiling** | 2–7 | With each feature |
-| **Security Review** | 4+ | Before external integrations (Phase 4 CI token + network use, Phase 5 OAuth/MCP) |
+| **Security Review** | 4+ | Before external integrations (Phase 5 OAuth/MCP, Phase 5.1 CI polling) |
 
 ---
 
@@ -393,6 +423,8 @@ Phase 4 (Developer) ←──────────────┐ │  │   
     ↓                              │ │  │   │
 Phase 5 (MCP) ←──────────────────┐ │ │  │   │
     ↓                            │ │ │  │   │
+Phase 5.1 (CI status) ←─────────┐ │ │ │  │   │
+    ↓                          │ │ │ │  │   │
 Phase 6 (Voice) ←──────────────┐ │ │ │  │   │
     ↓                          │ │ │ │  │   │
 Phase 7 (Characters) ←────────┐ │ │ │ │  │   │
@@ -505,3 +537,15 @@ Consequences carried into the same body text and downstream documents:
 - ADR-009's polling exceptions are renumbered CI → Phase 4, MCP refresh → Phase 5 (see ADR-015).
 - Meeting transcription (the `meetings.transcript` column) follows Voice to Phase 6.
 - The Phase 7 gate now reads "Phase 6 shipping checklist met".
+
+### Amendment A-4 (2026-10-03) — CI status moves after MCP
+The product owner decided CI is built after MCP integration. Phase numbers 1–7 are unchanged; CI status becomes **Phase 5.1**, shipping after Phase 5 and before Voice.
+
+| | Was (A-3) | Now |
+|---|-----------|-----|
+| Phase 4 Developer Companion | git + build + CI status | **git + local build only**; fully offline |
+| CI status checks, CI reactions, CI-failure task suggestion | Phase 4 | **Phase 5.1** |
+| CI credentials | pasted access token in keychain | **Phase 5 GitHub OAuth** + keychain |
+| ADR-009 CI polling exception | Phase 4 | Phase 5.1 |
+
+Consequences: Phase 4 makes no network requests, so the zero-network firewall test still holds through it; no credential is needed before OAuth exists; the pasted-token UX is dropped. Phase 5.1 depends on Phase 5's GitHub OAuth, so a Phase 5 slip delays CI but nothing else. See ADR-016.

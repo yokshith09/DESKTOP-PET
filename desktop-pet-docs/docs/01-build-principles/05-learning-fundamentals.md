@@ -66,7 +66,7 @@ Any of these = stop, learn the concept, write it down, continue.
 | Concept | Phase | Done when you can… |
 |---------|-------|--------------------|
 | File-system watchers | 4 | Watch `.git` without recursive overload (`notify` crate) |
-| Secure credential storage | 4, 5 | Store tokens in OS keychain / Credential Manager, never in SQLite |
+| Secure credential storage | 5 | Store tokens in OS keychain / Credential Manager, never in SQLite |
 | OAuth 2.0 + PKCE for desktop apps | 5 | Explain loopback redirect and why desktop apps can't hold a client secret |
 | MCP protocol (client side) | 5 | Connect to an MCP server, list tools, call one |
 | Audio capture & permissions | 6 | Request mic permission on both OSes, capture only on activation |
@@ -118,6 +118,9 @@ Before adding any crate or npm package, answer in the PR:
 ---
 
 ## Amendments
+
+### Amendment A-3 (2026-10-03)
+Secure credential storage moves from Phases 4, 5 to Phase 5 only: Phase 4 is offline and holds no credentials (ADR-016).
 
 ### Amendment A-2 (2026-10-03)
 Phase column and row order of the "Before Phases 4–7" table follow the owner's phase order (ADR-015): Developer 4, MCP 5, Voice 6, Characters 7.

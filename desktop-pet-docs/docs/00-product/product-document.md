@@ -1,5 +1,5 @@
 # LOAF — Product Document
-**Version 1.2** · **Status: 🔒 LOCKED (D0) · amended D0-A1, D0-A2**  
+**Version 1.3** · **Status: 🔒 LOCKED (D0) · amended D0-A1, D0-A2, D0-A3**  
 **Last updated:** October 3, 2026 (see §15 Amendments)
 
 ---
@@ -614,7 +614,7 @@ Microphone → Audio Buffer → Wake Detection → JEV → Intent → Action
 
 ---
 
-### 4.13 Developer Companion Features (Priority P2 · Phase 4)
+### 4.13 Developer Companion Features (Priority P2 · Phase 4 local git/build · Phase 5.1 CI)
 
 **Definition:** System reactions to development-specific events.
 
@@ -626,6 +626,8 @@ Microphone → Audio Buffer → Wake Detection → JEV → Intent → Action
 - CI failed (automated tests fail)
 - Deployment started
 - Deployment completed
+
+**Phase split (D0-A3):** git, local build and their reactions ship in Phase 4. CI passed/failed, deployment events and CI-failure task suggestion ship in Phase 5.1, after MCP.
 
 **Pet reactions to developer events:**
 - `git push` → Celebration animation
@@ -639,7 +641,7 @@ Microphone → Audio Buffer → Wake Detection → JEV → Intent → Action
 **Developer companion capabilities:**
 - Watch local git repository for activity
 - Poll or hook into build system
-- Read CI output (GitHub Actions, Jenkins, etc.)
+- Read CI output (GitHub Actions, Jenkins, etc.) — *Phase 5.1*
 - Show build status in dashboard
 - Notify on build failure
 - Suggest task creation on CI failure
@@ -1093,7 +1095,7 @@ The following are explicitly **not** part of the initial release but may be adde
 
 - **Owner:** [Product Manager]
 - **Last Updated:** October 3, 2026
-- **Version:** 1.2
+- **Version:** 1.3
 - **Status:** 🔒 Locked · amended (see §15)
 
 ---
@@ -1140,3 +1142,7 @@ The following are explicitly **not** part of the initial release but may be adde
 Scope is unchanged — nothing moved into or out of v1. Three knock-on effects, recorded in ADR-015 and `02-build-order.md` A-3: the MCP client scaffold and OAuth moved from the Voice phase to the MCP phase; Developer Companion now runs before OAuth exists, so its CI checks use a keychain-held access token; and meeting transcription follows Voice to Phase 6. §4.4 and §11 were updated to match.
 
 **Authority rule unchanged:** phase numbering lives in `01-build-principles/02-build-order.md`.
+
+### Amendment D0-A3 (2026-10-03) — CI moves after MCP
+
+The product owner decided CI is built after MCP integration. §4.13 splits: git and local-build awareness stay in **Phase 4**; CI status, CI reactions, deployment events and CI-failure task suggestions move to **Phase 5.1**, after MCP and before Voice. No phase renumbering and no change to v1 scope. CI authenticates through the Phase 5 GitHub login, replacing the pasted-token assumption in D0-A2's knock-on notes. See ADR-016 and `02-build-order.md` A-4.
