@@ -1,6 +1,6 @@
 # Learning Fundamentals — Understand Before You Build
 
-> **Status: 🔒 LOCKED** — v1.0, 2026-10-02. Changes require a written amendment at the bottom of this file.
+> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **amended A-1 (2026-10-03)**. Changes require a written amendment at the bottom of this file.
 
 Loaf's constraints (event-driven, <1% idle CPU, <100 MB RAM, local-first) cannot be met by copying patterns you don't understand. This file defines **what you must understand before building each layer**, and how to learn it without stalling the build.
 
@@ -35,7 +35,7 @@ Any of these = stop, learn the concept, write it down, continue.
 
 | Concept | Why | Done when you can… |
 |---------|-----|--------------------|
-| SQLite FTS5 | Search <500 ms on 5000 items | Build an FTS5 table, keep it in sync with triggers, rank results |
+| SQLite FTS5 | Search <500 ms on 5000 items | Build an FTS5 table, keep it in sync **from the repository layer inside the write transaction** (ADR-014), rank results with `bm25` |
 | React state & rendering | Notes UI | Explain what triggers a re-render and prevent unnecessary ones |
 | Controlled inputs + debouncing | Search, editors | Implement a 300 ms debounce without a library |
 | Keyboard event handling | Shortcuts | Handle Ctrl/Cmd differences across OSes |
@@ -114,6 +114,18 @@ Before adding any crate or npm package, answer in the PR:
 - ❌ Choosing a library because it's popular, not because it fits the constraints
 - ❌ Learning a whole framework before writing line one
 - ❌ Optimizing code you haven't measured
+
+---
+
+## Amendments
+
+### Amendment A-1 (2026-10-03)
+The Phase 1 FTS5 row said to keep the index in sync "with triggers", echoing
+the original wording of ADR-006. ADR-014 supersedes that: the index is
+maintained by the repository layer inside the source write's transaction.
+The learning requirement is unchanged in substance — you must still be able
+to build an FTS5 table and rank results — but the mechanism to understand is
+transactional reindexing, not trigger authoring.
 
 ---
 

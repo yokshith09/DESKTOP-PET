@@ -1,8 +1,9 @@
 # Loaf — Technical Requirements Document (TRD)
 
-**Milestone:** D3 · **Version:** 1.0 · **Date:** 2026-10-02 · **Status:** 🟡 Review
-**Derives from:** PRD (D2), ADR-001…013 (`01-build-principles/07-architecture-decisions.md`), budgets (`09-performance-budgets.md`)
-**Schema:** `05-backend/backend-schema.md` (D6)
+**Milestone:** D3 · **Version:** 1.1 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
+**Derives from:** PRD (D2 v1.1), ADR-001…014 (`01-build-principles/07-architecture-decisions.md`), budgets (`09-performance-budgets.md`)
+**Schema:** `05-backend/backend-schema.md` (D6 v1.1)
+**Changes in v1.1:** see §12.
 
 This TRD defines **how** Phase 0 and Phase 1 are built: components, threads, events, IPC contracts, OS integration, and verification. It does not restate ADR rationale — it applies it.
 
@@ -178,8 +179,8 @@ All commands return `Result<T, AppError>`; `AppError` serializes to `{ code, mes
 | `events` | `Event` enum, bus handle, subscription helpers | Contain business logic |
 | `commands` | Tauri command fns, input validation, mapping to services | Touch SQL directly |
 | `domain` | Pure types + rules: `Note`, `Task`, state machine, validation | Do I/O |
-| `db` | Connections, migrations, repositories, write loop, search reindex | Publish events before commit |
-| `search` | Query parsing, FTS query building, ranking | Mutate data |
+| `db` | Connections, migrations (runner owns the transaction and `user_version`), repositories, write loop, search reindex | Publish events before commit; let a migration file open its own transaction |
+| `search` | Query parsing, FTS query building, ranking, `reindex(entity)` called inside the caller's write transaction (ADR-014) | Mutate source data; reindex outside the source transaction |
 | `daily_log` | Live computation, snapshot building, reconstruction, rollover handling | Depend on wall clock directly (uses `Clock` trait) |
 | `scheduler` | Next-midnight timer, wake/TZ hooks → `DayRolledOver` | Poll |
 | `settings` | Defaults, typed access, change events | Store secrets |
@@ -278,3 +279,17 @@ Frameless, transparent, `skipTaskbar`, `alwaysOnTop` per setting, `focus: false`
 | R1-60..R1-65 | §6.7 |
 | R1-81 | §6.5 |
 | NFR privacy | §7 |
+
+## 12. Amendments
+
+### Amendment D3-A1 (2026-10-03) — locked
+
+No architecture changed; three clarifications so the TRD can't be read against the schema or the ADR log:
+
+| § | Change |
+|---|--------|
+| Header | Derives-from now cites ADR-001…**014** (ADR-014 added) and D2/D6 v1.1 |
+| §5 `db` | States that the **migration runner owns the transaction and `user_version`**, and adds "let a migration file open its own transaction" to the must-not column (Schema §5, Amendment D6-A1 #1) |
+| §5 `search` | States that `reindex(entity)` runs **inside the caller's write transaction** per ADR-014, and must not run outside it — replacing any reading of ADR-006's trigger-based sync |
+
+§3's event catalog is unchanged: `SearchIndexRebuilt` already covered the manual and startup rebuild paths that ADR-014's guardrails require.

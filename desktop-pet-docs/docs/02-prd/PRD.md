@@ -1,7 +1,8 @@
 # Loaf — Product Requirements Document (PRD)
 
-**Milestone:** D2 · **Version:** 1.0 · **Date:** 2026-10-02 · **Status:** 🟡 Review → lock after approval of §9 decisions
-**Derives from:** `docs/00-product/product-document.md` (D0), `docs/01-build-principles/` (D1)
+**Milestone:** D2 · **Version:** 1.1 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED — §9 decisions D-1…D-10 approved 2026-10-03
+**Derives from:** `docs/00-product/product-document.md` (D0 v1.1), `docs/01-build-principles/` (D1)
+**Changes in v1.1:** §9 approved and locked; §8 phase numbering reconciled with D0 Amendment D0-A1. See §12.
 
 This PRD turns the Product Document into **testable requirements**. Phase 0 and Phase 1 (the first release) are specified to feature level. Phases 2–7 are specified to capability level and get their own PRD addendum before their build starts (Principle 4: one phase at a time).
 
@@ -83,7 +84,7 @@ Requirement IDs map 1:1 to feature specs (`F1-xx`) in the Implementation Plan.
 | R1-05 | Delete note | Confirm dialog; 5-second Undo toast; after that the note is gone (no trash in v1) |
 | R1-06 | Pin / unpin | From card hover, editor toolbar, or shortcut; reflects instantly |
 | R1-07 | Archive / restore | Archived notes leave the Notes list, appear in Archive view, remain searchable (marked "Archived") |
-| R1-08 | Labels | Add/remove multiple labels; autocomplete existing; create inline; rename/delete label in Labels manager; deleting a label removes it from notes, not the notes |
+| R1-08 | Labels | Add/remove multiple labels; autocomplete existing; create inline; rename/delete label in Labels manager; deleting a label removes it from notes, not the notes. Label names are unique case-insensitively **including non-ASCII** (`work`/`WORK`, `Éclair`/`ÉCLAIR` are the same label) — creating or renaming to an existing name selects it instead of duplicating (Schema §3.2) |
 | R1-09 | Label filter | Sidebar label list filters Notes view; count shown per label |
 | R1-10 | Color | 8 colors + default; color shows on card and editor background tint |
 | R1-11 | Markdown | Body stored as Markdown source; Edit mode = plain text; Preview mode renders headings, lists, checkboxes (read-only), code, links, bold/italic; raw HTML is not rendered |
@@ -101,7 +102,7 @@ Requirement IDs map 1:1 to feature specs (`F1-xx`) in the Implementation Plan.
 | R1-26 | Link note | Task can link to one note; link opens the note; deleting the note clears the link |
 | R1-27 | Task views | Today (planned today + overdue + in progress), Upcoming (next 7 days), Pending, All (with filters: status, priority, project, date range), Completed (history) |
 | R1-28 | Overdue | Task with due date < today and status not COMPLETED/CANCELLED shows Overdue badge |
-| R1-29 | Delete task | Allowed only from CANCELLED or COMPLETED state, with confirm (⚠ deviation — see §9 D-3) |
+| R1-29 | Delete task | Allowed only from CANCELLED or COMPLETED state, with confirm (§9 D-3, approved). Deleting a task erases its `task_events` history; past daily logs are unaffected because snapshots copy titles (Schema §3.4, §3.7) |
 
 #### 6.2.1 Task State Machine (authoritative)
 
@@ -113,7 +114,7 @@ Requirement IDs map 1:1 to feature specs (`F1-xx`) in the Implementation Plan.
 | COMPLETED | ✅ Reopen | ❌ | ❌ | — | ❌ |
 | CANCELLED | ✅ Reopen | ❌ | ❌ | ❌ | — |
 
-\* Direct completion without starting is allowed (users often finish small tasks without marking start). `started_at` stays null in that case. This is an interpretation of D0 §4.2 — see §9 D-4.
+\* Direct completion without starting is allowed (users often finish small tasks without marking start). `started_at` stays null in that case. Resolves D0 §4.2 — see §9 D-4 (approved).
 
 ### 6.3 Meetings
 
@@ -194,18 +195,20 @@ Authoritative numbers live in `09-performance-budgets.md`. Summary:
 
 ## 8. Later Phases — Capability Requirements (Addendum required before build)
 
-| Phase | Must deliver | Key open questions for its PRD addendum |
-|-------|-------------|------------------------------------------|
-| 2 Browser Intelligence | Extensions ×4, native bridge, app + domain time, open tabs with close, privacy radar, dashboard | Store URL or domain only by default? Category taxonomy? Incognito handling (must be excluded) |
-| 3 Pet & Companion | Animations, event reactions (D0 §4.6.1), sleep mode, greeting, hover | Character design; reaction rate-limiting so it's never annoying |
-| 4 Voice & Integrations Foundation | Activation-based voice, JEV provider, intents → note/task/query, MCP client scaffold, OAuth | JEV local vs API (privacy vs accuracy); TTS needed? |
-| 5 Developer Companion | Git watcher, build/CI state, pet reactions, task-from-failure | Which build tools detected; repo discovery UX |
-| 6 MCP Integrations | Gmail, GitHub, Slack, Calendar, Notion read-only, cached locally | Data retention for cached remote data |
-| 7 Character Ecosystem | 18 characters, outfits, seasonal, app-specific reactions | Asset pipeline, download vs bundled |
+Phase numbering is authoritative in `01-build-principles/02-build-order.md` and matches D0 as amended (D0-A1).
 
-## 9. Decisions Made in This PRD (approve or reject)
+| Phase | D0 component | Must deliver | Key open questions for its PRD addendum |
+|-------|--------------|-------------|------------------------------------------|
+| 2 Browser Intelligence | §4.7–4.9 | Extensions ×4, native bridge, app + domain time, open tabs with close, privacy radar, dashboard | Store URL or domain only by default? Category taxonomy? Incognito handling (must be excluded) |
+| 3 Pet & Companion | §4.6 (reactive) | Animations, event reactions (D0 §4.6.1), sleep mode, greeting, hover | Character design; reaction rate-limiting so it's never annoying |
+| 4 Voice & Integrations Foundation | §4.11, §4.12 (scaffold) | Activation-based voice, JEV provider, intents → note/task/query, MCP client scaffold, OAuth | JEV local vs API (privacy vs accuracy); TTS needed? |
+| 5 Developer Companion | §4.13 | Git watcher, build/CI state, pet reactions, task-from-failure | Which build tools detected; repo discovery UX |
+| 6 MCP Integrations | §4.12 (integrations) | Gmail, GitHub, Slack, Calendar, Notion read-only, cached locally | Data retention for cached remote data |
+| 7 Character Ecosystem | §4.14 | 18 characters, outfits, seasonal, app-specific reactions | Asset pipeline, download vs bundled |
 
-These resolve gaps or contradictions in D0. Each is a [Likely]-quality judgment, not a fact.
+## 9. Decisions (🔒 APPROVED 2026-10-03)
+
+These resolve gaps or contradictions in D0. Each was a [Likely]-quality judgment when proposed; all ten were **approved on 2026-10-03** and are now binding. Changes go through PRD amendments (§12), not edits.
 
 | ID | Gap in D0 | Decision | Reason |
 |----|-----------|----------|--------|
@@ -245,4 +248,14 @@ Cut from the bottom first; never cut above the line.
 
 ---
 
-**Approval:** Once §9 is approved, this PRD is locked and all changes go through amendments.
+## 12. Amendments
+
+### Amendment D2-A1 (2026-10-03) — locked
+
+- §9 decisions **D-1 … D-10 approved** and marked binding. No decision text changed; only its status.
+- §8 phase table gained a D0-component column and a pointer to `02-build-order.md` as the authority for phase numbering, following D0 Amendment D0-A1. Phase assignments in §8 were already correct and are unchanged.
+- R1-08 gained an explicit acceptance criterion for case-insensitive label uniqueness across the full Unicode range, so Schema Amendment D6-A1 #3 is testable at requirement level.
+- R1-29 now states the history consequence of task deletion (Schema §3.4), so the no-`DELETED`-event decision is visible where the delete rule lives.
+- R1-29 and §6.2.1 wording updated from "deviation"/"interpretation pending" to approved.
+
+**Approval:** §9 is approved and this PRD is locked. All further changes are amendments appended above.

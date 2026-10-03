@@ -1,7 +1,8 @@
 # Loaf — UI/UX Design Brief
 
-**Milestone:** D5 · **Version:** 1.0 · **Date:** 2026-10-02 · **Status:** 🟡 Review
-**Derives from:** PRD (D2), App Flow (D4) · **Feeds:** feature specs (`06-feature-definition.md`), frontend implementation
+**Milestone:** D5 · **Version:** 1.1 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
+**Derives from:** PRD (D2 v1.1), App Flow (D4 v1.1) · **Feeds:** feature specs (`06-feature-definition.md`), frontend implementation
+**Changes in v1.1:** §10 pet table phase label aligned with D0 Amendment D0-A1 (characters = Phase 7); tokens, wireframes and keymap unchanged.
 
 This brief gives enough direction to build Phase 1 UI without a separate Figma pass. Visual polish (illustration, final pet art) can be iterated without changing structure.
 
@@ -295,7 +296,7 @@ Loading: skeleton rows only if a load exceeds 150 ms (most won't). Errors: inlin
 
 | Item | Phase 1 | Phase 3+ |
 |------|---------|----------|
-| Character | One original character. Working concept: **a small round loaf-shaped creature with a tiny face** — fits the name, readable at 48 px, ownable | Animations, reactions, 18 characters (Phase 7) |
+| Character | One original character. Working concept: **a small round loaf-shaped creature with a tiny face** — fits the name, readable at 48 px, ownable | Animations and reactions (Phase 3); 18 characters and outfits (Phase 7) |
 | Asset | Single idle frame PNG/WebP with alpha; master at 512×512, exported at 64 / 96 / 128 px (S/M/L) @1x and @2x | Sprite sheets, ≤3 s per animation, 30 FPS cap |
 | Style | Flat shapes, 2–3 tones, thin outline so it reads on light and dark desktops | Same style system |
 | Behavior | Static. Hover shows a subtle 1 px lift via CSS transform (no loop). Click opens Today | State machine (TRD §5 `pet`) |

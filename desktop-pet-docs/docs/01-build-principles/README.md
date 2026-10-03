@@ -1,6 +1,6 @@
 # Loaf — Build Principles Index & Milestone Plan
 
-Version 1.0 · 2026-10-02
+Version 1.1 · 2026-10-03 · **D0–D7 all locked**
 
 ## Document Status
 
@@ -13,7 +13,7 @@ Version 1.0 · 2026-10-02
 | 04 | testing-strategy.md | 🔒 Locked | Pyramid, TDD loop, tooling, coverage targets |
 | 05 | learning-fundamentals.md | 🔒 Locked | What to understand before each phase |
 | 06 | feature-definition.md | 🔒 Locked | Feature spec template, Ready/Done, F1 breakdown |
-| 07 | architecture-decisions.md | 🔒 Locked | ADR-001…013, Phase 0 verification tasks V-1…V-5 |
+| 07 | architecture-decisions.md | 🔒 Locked | ADR-001…014, Phase 0 verification tasks V-1…V-5 |
 | 08 | code-organization.md | ⏸ On hold | Unlocks after scaffold + event bus exist |
 | 09 | performance-budgets.md | 🔒 Locked | Ceilings, per-phase allocation, measurement |
 | 10 | team-coordination.md | ⏸ On hold | Unlocks at 2nd contributor or end of Phase 0 |
@@ -41,12 +41,12 @@ Version 1.0 · 2026-10-02
 |----|-----------|-----------|----------------|
 | D0 | Product Document | — | ✅ Done |
 | D1 | Build Principles (this set) | D0 | ✅ Done — 9 locked, 3 on hold |
-| D2 | PRD | D0, D1 | ✅ Drafted — `docs/02-prd/PRD.md` (approve §9 to lock) |
-| D3 | TRD | D2, 07 | ✅ Drafted — `docs/03-trd/TRD.md` |
-| D4 | App Flow | D2 | ✅ Drafted — `docs/04-design/app-flow.md` |
-| D5 | UI/UX Design Brief | D4 | ✅ Drafted — `docs/04-design/ui-ux-brief.md` |
-| D6 | Backend Schema | D3 | ✅ Drafted — `docs/05-backend/` (migration 001 tested) |
-| D7 | Implementation Plan | D2–D6 | ✅ Drafted — `docs/06-plan/implementation-plan.md` |
+| D2 | PRD | D0, D1 | 🔒 Locked 2026-10-03 — `docs/02-prd/PRD.md` (§9 D-1…D-10 approved) |
+| D3 | TRD | D2, 07 | 🔒 Locked 2026-10-03 — `docs/03-trd/TRD.md` |
+| D4 | App Flow | D2 | 🔒 Locked 2026-10-03 — `docs/04-design/app-flow.md` |
+| D5 | UI/UX Design Brief | D4 | 🔒 Locked 2026-10-03 — `docs/04-design/ui-ux-brief.md` |
+| D6 | Backend Schema | D3 | 🔒 Locked 2026-10-03 — `docs/05-backend/` (migration 001 applied on SQLite 3.45.1) |
+| D7 | Implementation Plan | D2–D6 | 🔒 Locked 2026-10-03 — `docs/06-plan/implementation-plan.md` |
 
 ### Stage B — Build Checkpoints (Phases 0 → 1, first shippable product)
 
@@ -81,3 +81,23 @@ D2 PRD → D4 Flow → D5 UI ────┼→ D7 Plan → CP1 → CP2 → CP3 
                              │
           CP1 V-2 (RAM) ─────┘  ← highest-risk item; can change budgets before CP2
 ```
+
+---
+
+## Cross-Document Consistency Review (2026-10-03)
+
+Run before locking D2–D7. Seven findings, all resolved; each is recorded as an
+amendment in the document that owns the decision.
+
+| # | Finding | Severity | Resolved in |
+|---|---------|----------|-------------|
+| 1 | D2–D7 blocked on PRD §9 approval | Blocker | PRD §9 approved; D2–D7 locked |
+| 2 | ADR-006 (locked) mandated trigger-based FTS sync; D6 §3.8 rejected triggers | Contradiction between locked and derived docs | **ADR-014** supersedes ADR-006 on the mechanism; 05 Amendment A-1; TRD §5 |
+| 3 | D0 phase numbers (Voice P3, MCP P3–P4, Dev P4, Characters P5) contradicted 02/PRD/plan (4/6/5/7) | Contradiction in the locked source of truth | **D0 Amendment D0-A1**; PRD §8; D4 §7; D5 §10 |
+| 4 | `task_events.kind = 'DELETED'` unreachable — `task_id` cascades | Schema defect | Schema Amendment D6-A1 #2; migration 001; PRD R1-29 |
+| 5 | Migration 001 embedded `BEGIN`/`COMMIT` + `user_version`, conflicting with the runner's transaction (ADR-007) | Schema defect — would fail at runtime | Schema Amendment D6-A1 #1; migration 001; TRD §5; plan F0-04 |
+| 6 | "Unique case-insensitively" claimed, but `COLLATE NOCASE` folds ASCII only | Overstated guarantee | Schema Amendment D6-A1 #3 (`name_folded`); PRD R1-08; plan F1-07 |
+| 7 | Committed `.zip` + `.bundle` and a duplicate root `implementation-plan.md` | Repo hygiene | Removed; `docs/` is the single source |
+
+Findings 4–6 were verified empirically against SQLite 3.45.1 before the fix was
+written, not reasoned about on paper.

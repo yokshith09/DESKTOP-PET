@@ -1,8 +1,9 @@
 # Loaf — Backend Schema
 
-**Milestone:** D6 · **Version:** 1.0 · **Date:** 2026-10-02 · **Status:** 🟡 Review
-**Executable source of truth:** [`migrations/001_initial.sql`](migrations/001_initial.sql) — verified against SQLite 3.45 (FTS5, STRICT tables, triggers).
-**Derives from:** PRD (D2), TRD (D3), ADR-005/006/007
+**Milestone:** D6 · **Version:** 1.1 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
+**Executable source of truth:** [`migrations/001_initial.sql`](migrations/001_initial.sql) — applied against SQLite 3.45.1 inside a runner-owned transaction (FTS5, STRICT tables, triggers, constraints exercised).
+**Derives from:** PRD (D2), TRD (D3), ADR-005/007/014
+**Changes in v1.1:** see [§8 Amendments](#8-amendments).
 
 ---
 
@@ -20,6 +21,8 @@
 | JSON | Only for `settings`, `user_preferences`, `daily_logs.snapshot` | These are documents, not relations |
 
 **Connection PRAGMAs** (set by Rust on every open): `journal_mode=WAL`, `foreign_keys=ON`, `synchronous=NORMAL`, `busy_timeout=5000`. On startup: `PRAGMA quick_check`; on failure, the app refuses to write and offers restore from the latest `.bak`.
+
+**Transaction ownership:** the migration runner wraps each migration file in one transaction and sets `PRAGMA user_version` itself. Migration files contain no `BEGIN`/`COMMIT` and no `user_version` write — see §5.
 
 ## 2. Entity-Relationship Diagram
 
@@ -68,7 +71,11 @@ Values are JSON (`true`, `"dark"`, `{"x":1200,"y":800}`). Defaults live in Rust,
 | `pinned`, `archived` | 0/1 | Archived + pinned allowed; pin ignored while archived |
 | `edited_at` | ms | Changes only when title/body/color/labels change, not on pin/archive |
 
-Label names are unique **case-insensitively**. Deleting a label cascades only the join rows.
+Label names are unique **case-insensitively across the full Unicode range**, enforced by a unique index on `labels.name_folded`. `name` keeps the user's typed casing for display; `name_folded` is produced by Rust's Unicode lowercasing (`str::to_lowercase`) on every create and rename and is the only uniqueness key.
+
+[Certain] `COLLATE NOCASE` was rejected for this: SQLite's built-in NOCASE collation folds ASCII `A–Z` only, so it treats `WORK`/`work` as duplicates but accepts `ÉCLAIR` alongside `Éclair`. Verified on SQLite 3.45.1 — a `name_folded` index rejects both.
+
+Deleting a label cascades only the join rows.
 
 ### 3.3 `tasks`
 
@@ -85,6 +92,10 @@ Label names are unique **case-insensitively**. Deleting a label cascades only th
 ### 3.4 `task_events` (append-only)
 
 The **single source of truth for history**. Every create, status change, defer, and significant edit writes one row in the same transaction as the task change. A trigger blocks `UPDATE`. `local_date` is stored at write time so a later timezone change can't move history to a different day.
+
+`kind` is one of `CREATED`, `STATUS`, `DEFERRED`, `EDITED`.
+
+[Certain] **There is deliberately no `DELETED` kind.** `task_events.task_id` is `ON DELETE CASCADE`, so a row written to record a task's deletion is erased by that same deletion — the event could never be read back. Deletion is instead safe to lose because of two other rules: a task can only be deleted from `COMPLETED` or `CANCELLED` (PRD R1-29), and frozen daily logs copy task titles into their snapshot (§3.7), so a past day still reads correctly after the task is gone. If per-task deletion history is ever needed, it requires a separate non-cascading audit table and its own ADR — not a cascading event row.
 
 Uses:
 - Completion history view (R1-27 Completed)
@@ -147,7 +158,7 @@ Snapshot JSON, `snapshot_version = 1`:
 
 Tokenizer: `unicode61 remove_diacritics 2 tokenchars '#@'` → case-insensitive, `#work` and `@name` stay single tokens. Prefix indexes `2 3` make `hac*` fast.
 
-**Why app-maintained, not triggers:** indexed text spans parent + child tables (labels, participants, decisions). Triggers on six tables would be fragile. Instead every repository write that changes indexed text calls `search::reindex(entity)` **inside the same transaction**. Guardrails:
+**Why app-maintained, not triggers (ADR-014, supersedes ADR-006 on this point):** indexed text spans parent + child tables (labels, participants, decisions). Triggers on six tables would be fragile. Instead every repository write that changes indexed text calls `search::reindex(entity)` **inside the same transaction**. Guardrails:
 - Integration test: random CRUD sequence → index equals a from-scratch rebuild
 - Settings → Advanced → "Rebuild search index"
 - Startup: if `search_map` row count ≠ entity count, rebuild in background
@@ -169,8 +180,16 @@ Rules carried forward: writes buffered and flushed ≤1/min (ADR-005); untracked
 
 ## 5. Migration Policy (ADR-007)
 
-- Files: `NNN_description.sql`, embedded in the binary, applied in order inside a transaction
-- Version in `PRAGMA user_version`
+- Files: `NNN_description.sql`, embedded in the binary, applied in order
+- **The runner owns the transaction.** It issues `BEGIN`, executes the file, sets `PRAGMA user_version`, then `COMMIT`. A migration file must contain neither statement: [Certain] a `BEGIN` inside the runner's transaction fails with `cannot start a transaction within a transaction` (verified on SQLite 3.45.1), and a `user_version` written by the file can drift from the runner's bookkeeping.
+- **Lint rule for CP1 (F0-04).** Reject a migration file whose non-comment text matches:
+
+  ```
+  (?mi)^\s*(BEGIN|COMMIT|END|ROLLBACK)\s*(TRANSACTION|DEFERRED|IMMEDIATE|EXCLUSIVE)?\s*;|^\s*PRAGMA\s+user_version\s*=
+  ```
+
+  It must anchor on *standalone* transaction-control statements. A naive `BEGIN|COMMIT` search is wrong: `CREATE TRIGGER … BEGIN … END;` bodies contain both keywords, and this schema has three such triggers — the rule would reject its own migration. The regex above was checked against all three controls (flags a file that opens its own transaction, flags a `user_version` write, ignores trigger bodies).
+- Version in `PRAGMA user_version`, set by the runner only
 - Before applying: copy DB to `loaf.db.bak-<from_version>`; keep last 3 backups
 - Forward-only; a broken migration is fixed by a new migration
 - Every migration has a test: build DB at previous version with fixture data → migrate → assert data intact
@@ -208,4 +227,19 @@ Phase 2 activity data is the real growth risk; its PRD addendum must define rete
 }
 ```
 
-The search index is never exported; it is rebuilt after import.
+The search index is never exported; it is rebuilt after import. `labels` rows carry both `name` and `name_folded`; import recomputes `name_folded` from `name` rather than trusting the file, so an export edited by hand cannot smuggle in a duplicate label.
+
+---
+
+## 8. Amendments
+
+### Amendment D6-A1 (2026-10-03) — locked with four corrections
+
+Applied before lock, after a cross-document consistency review. Schema version stays `1`; no product code exists yet, so `001_initial.sql` was corrected in place rather than superseded by a `002`.
+
+| # | Was | Now | Why |
+|---|-----|-----|-----|
+| 1 | `001_initial.sql` wrapped itself in `BEGIN;…COMMIT;` and set `PRAGMA user_version = 1` | Both removed; runner owns the transaction and the version (§1, §5) | [Certain] ADR-007 has the runner open a transaction per migration; the file's own `BEGIN` fails inside it (reproduced on SQLite 3.45.1) |
+| 2 | `task_events.kind` allowed `'DELETED'` | Kind removed from the `CHECK` (§3.4) | [Certain] `task_id` cascades, so the row recording a deletion is destroyed by that deletion — the state was unreachable |
+| 3 | "Label names are unique case-insensitively", enforced by `UNIQUE INDEX … COLLATE NOCASE` | `labels.name_folded` column + unique index; Rust does Unicode lowercasing (§3.2) | [Certain] NOCASE folds ASCII only, so the stated guarantee did not hold for non-ASCII names |
+| 4 | §3.8 rejected triggers while ADR-006 (locked) mandated them | §3.8 cites ADR-014, which supersedes ADR-006 on the sync mechanism | ADR-006 could not be edited silently; a locked decision needs a superseding ADR |

@@ -1,6 +1,6 @@
 # Architecture Decisions — ADR Log
 
-> **Status: 🔒 LOCKED** — v1.0, 2026-10-02. Existing ADRs change only via a new ADR that supersedes them. New ADRs may be appended at any time.
+> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **ADR-014 appended 2026-10-03**. Existing ADRs change only via a new ADR that supersedes them. New ADRs may be appended at any time.
 
 Each decision records **what we chose, why, what we rejected, and what it costs**. Confidence tags: [Certain] verified fact, [Likely] strong inference, [Guessing] must be verified in Phase 0.
 
@@ -52,6 +52,8 @@ Each decision records **what we chose, why, what we rejected, and what it costs*
 - User-initiated writes (create/edit note) flush immediately — <100 ms target.
 
 ## ADR-006: Search via SQLite FTS5
+
+**Status:** Accepted · **superseded in part by ADR-014** (the "kept in sync with triggers" clause only; FTS5 itself stands).
 
 **Decision:** FTS5 virtual tables for notes, tasks, meetings, daily logs, kept in sync with triggers. Single search query unions the indexes and ranks with `bm25`.
 **Why:** Meets <500 ms on 5000 items without external engines.
@@ -111,6 +113,22 @@ Any new exception requires a new ADR.
 
 **Decision:** Enforce single instance (second launch focuses the existing one). Closing the main window hides to tray; quitting is explicit from the tray. Auto-start via OS login-item mechanisms.
 **Why:** A companion must be persistent without spawning duplicates that double resource use.
+
+---
+
+## ADR-014: Search index maintained by the repository layer, not SQL triggers
+
+**Status:** Accepted (2026-10-03) · **Supersedes ADR-006** on the sync mechanism only. FTS5 as the search engine, the single unified index, and `bm25` ranking are unchanged.
+
+**Decision:** The FTS5 index is written by Rust. Every repository write that changes indexed text calls `search::reindex(entity)` **inside the same transaction** as the source write. No `CREATE TRIGGER` keeps `search_index` in sync.
+
+**Why:** A single indexed document spans a parent row and its children — a note's text plus its labels, a meeting's text plus its participants, decisions and action items. Trigger-based sync would need triggers on six tables (`notes`, `note_labels`, `labels`, `meeting_participants`, `meeting_decisions`, `meeting_action_items`), each having to re-derive the *whole* document from its own narrow view of the change. That is the fragile part: a missing trigger silently returns wrong search results, which is invisible until a user can't find their own note. One reindex call per aggregate write is one place to get right and one place to test.
+
+**Rejected:** Triggers (as ADR-006 originally stated) — fragility above, and `AFTER DELETE` on a cascade gives no reliable hook to rebuild sibling documents. Rebuilding the index outside the write transaction — a crash between the two leaves search lying about the data.
+
+**Cost / Risk:** Correctness now depends on application discipline, not the database. Three guardrails, all required (backend-schema.md §3.8): an integration test asserting a random CRUD sequence yields an index byte-identical to a from-scratch rebuild; a user-facing **Settings → Advanced → Rebuild search index**; and a startup check that rebuilds in the background when `search_map` row count ≠ entity count.
+
+**Verification:** The consistency test above is an exit-gate item for CP4 feature F1-20.
 
 ---
 

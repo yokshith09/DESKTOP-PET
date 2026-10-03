@@ -1,7 +1,8 @@
 # Loaf — Implementation Plan (Phase 0 + Phase 1)
 
-**Milestone:** D7 · **Version:** 1.0 · **Date:** 2026-10-02 · **Status:** 🟡 Review
-**Derives from:** PRD (D2), TRD (D3), App Flow (D4), UI/UX Brief (D5), Schema (D6), Build Principles (D1)
+**Milestone:** D7 · **Version:** 1.1 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
+**Derives from:** PRD (D2 v1.1), TRD (D3 v1.1), App Flow (D4 v1.1), UI/UX Brief (D5 v1.1), Schema (D6 v1.1), Build Principles (D1)
+**Changes in v1.1:** CP1 kickoff checklist item 1 discharged (PRD §9 approved 2026-10-03); F0-04 and F1-20 acceptance tightened to cover Schema Amendment D6-A1 and ADR-014.
 
 This plan supersedes the *starting* feature list in `06-feature-definition.md` (which said the plan would finalize it). Feature IDs below are final.
 
@@ -55,7 +56,7 @@ Order matters: each feature depends only on those above it.
 | F0-02 | CI matrix (fmt, clippy, tests, coverage, build) | 1.0 | F0-01 | PR runs green on `windows-latest` + `macos-latest` |
 | F0-13 | Error model (`AppError`), `tracing` logs, panic hook | 1.0 | F0-01 | Errors serialize to `{code,message}`; crash file written locally |
 | F0-03 | Event enum + broadcast bus + lag handling | 1.5 | F0-13 | Unit tests: publish/subscribe, lag → resync path |
-| F0-04 | DB open, PRAGMAs, migration runner, backup-before-migrate, `quick_check`, migration 001 | 1.5 | F0-13 | Fresh DB at OS path; `user_version=1`; failed migration leaves original intact (test) |
+| F0-04 | DB open, PRAGMAs, migration runner, backup-before-migrate, `quick_check`, migration 001 | 1.5 | F0-13 | Fresh DB at OS path; **runner owns the transaction and sets `user_version=1`**; lint rejects a migration file that opens its own transaction or writes `user_version` (Schema §5 regex — must not false-positive on `CREATE TRIGGER … BEGIN … END`); failed migration leaves original intact (test) |
 | F0-05 | DB writer thread, WriteRequest/oneshot, publish-after-commit | 1.5 | F0-03, F0-04 | Integration test: event never observed before commit |
 | F0-06 | `Clock` trait + rollover scheduler (midnight, wake, TZ) | 2.0 | F0-03 | Fake-clock tests: midnight, DST, TZ change, sleep across midnight |
 | F0-07 | Settings + preferences services, IPC, TS type generation | 1.5 | F0-05 | `SettingChanged` round-trip UI↔core; defaults when key missing |
@@ -78,7 +79,7 @@ Order matters: each feature depends only on those above it.
 | F1-04 | Delete with 5 s undo | 1.0 | F1-02 | R1-05 |
 | F1-05 | Pin / unpin | 0.5 | F1-02 | R1-06 |
 | F1-06 | Archive / restore + Archive view | 1.0 | F1-02 | R1-07 |
-| F1-07 | Labels: add/remove/autocomplete, sidebar filter, manager | 2.0 | F1-02 | R1-08, R1-09 |
+| F1-07 | Labels: add/remove/autocomplete, sidebar filter, manager; Unicode-folded uniqueness (Schema §3.2) | 2.0 | F1-02 | R1-08, R1-09 |
 | F1-08 | Note color | 0.5 | F1-01 | R1-10 |
 | F1-09 | Markdown Edit/Preview (HTML disabled) | 1.0 | F1-01 | R1-11 |
 | | **CP2 total** | **10.0** | | |
@@ -107,7 +108,7 @@ F1-15 test matrix (all with `FakeClock`): normal midnight · app closed 3 days �
 | F1-17 | Meeting create/edit (aggregate save) + participants + autocomplete | 2.0 | CP3 | R1-30, R1-31, R1-35 |
 | F1-18 | Decisions + action items (ordered lists) | 1.0 | F1-17 | R1-32, R1-33 |
 | F1-19 | Convert action item → task (+ live status chip) | 1.0 | F1-18 | R1-34 |
-| F1-20 | Search service: query builder, filters, bm25 ranking, rebuild, consistency test | 2.5 | F1-19 | R1-51..R1-55 |
+| F1-20 | Search service: query builder, filters, bm25 ranking, rebuild, consistency test (ADR-014 guardrails: random-CRUD index == from-scratch rebuild, manual rebuild, startup count mismatch → background rebuild) | 2.5 | F1-19 | R1-51..R1-55 |
 | F1-21 | Search overlay UI: grouping, highlight, keyboard nav | 2.0 | F1-20 | R1-50, R1-56 |
 | F1-22 | Minimal pet window: static sprite, drag, persist per display, show/hide, size/opacity/on-top, click→Today | 1.5 | CP1 | R1-60..R1-65 |
 | F1-23 | Today view (all sections) | 2.0 | F1-14, F1-16, F1-19 | R1-70 |
@@ -157,7 +158,7 @@ gates for Phase 2+), not by calendar date. Scope unchanged.
 
 ## 11. CP1 — Kickoff Checklist
 
-- [ ] Approve PRD §9 decisions and Amendment A-1
+- [x] ~~Approve PRD §9 decisions and Amendment A-1~~ — **done 2026-10-03**; D0–D7 all locked
 - [ ] Install toolchain: Rust stable, Node LTS + pnpm, Tauri v2 prerequisites (WebView2 on Windows, Xcode CLT on macOS)
 - [ ] Write feature spec files `docs/features/F0-01…F0-13` using the 06 template
 - [ ] F0-01: scaffold, run on both OSes, record V-1

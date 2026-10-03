@@ -1,6 +1,7 @@
 # Build Order — Phases & Milestones
 
-> **Status: 🔒 LOCKED** — v1.0, 2026-10-02. Changes require a written amendment at the bottom of this file.
+> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **amended A-1, A-2 (2026-10-03)**. Changes require a written amendment at the bottom of this file.
+> This file is the **authority for phase numbering** (see Amendment A-2).
 
 This is the canonical sequence for building Loaf. Each phase is a complete, shippable increment.
 
@@ -469,3 +470,17 @@ per-phase feature sizing live in the Implementation Plan
 (`docs/06-plan/implementation-plan.md`) and are re-estimated from
 that phase's own feature list immediately before the phase starts.
 Scope and phase order are unchanged.
+
+### Amendment A-2 (2026-10-03)
+**This document is the authority for phase numbering.** D0 Amendment D0-A1
+resolved a conflict in which `product-document.md` §4.11–§4.14 tagged Voice
+P3, MCP P3–P4, Developer Companion P4 and Characters P5, against the
+numbering used here and in the PRD and Implementation Plan. The numbering in
+this file was correct and is unchanged:
+
+| Phase | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|-------|---|---|---|---|---|---|---|
+| | Notes + minimal pet | Browser Intelligence | Pet & Companion | Voice & Integrations Foundation | Developer Companion | MCP Integrations | Character Ecosystem |
+
+D0 now states **priority** per component (P0/P1/P2/P3) and defers to this
+file for sequence. Any future phase renumbering amends this file first.

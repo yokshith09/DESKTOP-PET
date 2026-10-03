@@ -1,7 +1,8 @@
 # Loaf — App Flow: Surfaces, Screens & Navigation
 
-**Milestone:** D4 · **Version:** 1.0 · **Date:** 2026-10-02 · **Status:** 🟡 Review
-**Derives from:** PRD (D2) · **Feeds:** UI/UX Brief (D5), Implementation Plan (D7)
+**Milestone:** D4 · **Version:** 1.1 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
+**Derives from:** PRD (D2 v1.1) · **Feeds:** UI/UX Brief (D5), Implementation Plan (D7)
+**Changes in v1.1:** §7 phase numbers reconciled with D0 Amendment D0-A1 (Voice 4, Characters 7); no screen or flow changed.
 
 Scope: Phase 0 + Phase 1. Every screen has an ID (`S-xx`); every transition is listed. No screen may exist in code that isn't in this file.
 
@@ -179,7 +180,7 @@ Windows: left-click tray icon = Open Loaf; right-click = menu. macOS: click = me
 | Privacy Radar | 2 | Settings › Privacy |
 | Pet behavior settings, Sleep | 3 | Settings › Pet |
 | Voice | 4 | Global shortcut + pet |
-| Integrations | 4/6 | Settings › Integrations |
+| Integrations | 4 (scaffold) / 6 (services) | Settings › Integrations |
 | Characters / Closet | 7 | Settings › Pet › Characters |
 
 Sidebar order is designed now so later items slot in without reshuffling muscle memory: **Today · (Dashboard) · Tasks · Notes · Meetings · Daily Logs · — · Archive · Settings**.
