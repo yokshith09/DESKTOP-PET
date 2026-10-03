@@ -3,6 +3,9 @@
 //! This crate deliberately has no `tauri` dependency, so it builds and its tests
 //! run on any machine. `scripts/check-core-no-tauri.mjs` enforces that in CI.
 
+pub mod error;
+pub mod logging;
+
 /// The version of the core, taken from the workspace package version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
