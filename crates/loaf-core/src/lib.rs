@@ -8,7 +8,10 @@ pub mod clock;
 pub mod db;
 pub mod error;
 pub mod events;
+pub mod ids;
+pub mod labels;
 pub mod logging;
+pub mod notes;
 pub mod scheduler;
 
 /// The version of the core, taken from the workspace package version.

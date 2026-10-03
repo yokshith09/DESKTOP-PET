@@ -10,6 +10,9 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::labels::Label;
+use crate::notes::Note;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Event {
@@ -28,6 +31,32 @@ pub enum Event {
         at: i64,
         key: String,
         value: Value,
+    },
+    NoteCreated {
+        at: i64,
+        note: Note,
+    },
+    NoteUpdated {
+        at: i64,
+        note: Note,
+    },
+    NoteDeleted {
+        at: i64,
+        id: String,
+    },
+    NotePinnedChanged {
+        at: i64,
+        id: String,
+        pinned: bool,
+    },
+    NoteArchivedChanged {
+        at: i64,
+        id: String,
+        archived: bool,
+    },
+    LabelsChanged {
+        at: i64,
+        labels: Vec<Label>,
     },
     PetVisibilityChanged {
         at: i64,
@@ -71,6 +100,12 @@ impl Event {
             | Self::AppReady { at, .. }
             | Self::AppShuttingDown { at }
             | Self::SettingChanged { at, .. }
+            | Self::NoteCreated { at, .. }
+            | Self::NoteUpdated { at, .. }
+            | Self::NoteDeleted { at, .. }
+            | Self::NotePinnedChanged { at, .. }
+            | Self::NoteArchivedChanged { at, .. }
+            | Self::LabelsChanged { at, .. }
             | Self::PetVisibilityChanged { at, .. }
             | Self::PetMoved { at, .. }
             | Self::DataExported { at, .. }
@@ -88,6 +123,12 @@ impl Event {
             Self::AppReady { .. } => "AppReady",
             Self::AppShuttingDown { .. } => "AppShuttingDown",
             Self::SettingChanged { .. } => "SettingChanged",
+            Self::NoteCreated { .. } => "NoteCreated",
+            Self::NoteUpdated { .. } => "NoteUpdated",
+            Self::NoteDeleted { .. } => "NoteDeleted",
+            Self::NotePinnedChanged { .. } => "NotePinnedChanged",
+            Self::NoteArchivedChanged { .. } => "NoteArchivedChanged",
+            Self::LabelsChanged { .. } => "LabelsChanged",
             Self::PetVisibilityChanged { .. } => "PetVisibilityChanged",
             Self::PetMoved { .. } => "PetMoved",
             Self::DataExported { .. } => "DataExported",
@@ -115,6 +156,35 @@ pub(crate) fn one_of_each() -> Vec<Event> {
             at: 4,
             key: "general.theme".into(),
             value: serde_json::json!("dark"),
+        },
+        Event::NoteCreated {
+            at: 12,
+            note: Note::sample(),
+        },
+        Event::NoteUpdated {
+            at: 13,
+            note: Note::sample(),
+        },
+        Event::NoteDeleted {
+            at: 14,
+            id: "n1".into(),
+        },
+        Event::NotePinnedChanged {
+            at: 15,
+            id: "n1".into(),
+            pinned: true,
+        },
+        Event::NoteArchivedChanged {
+            at: 16,
+            id: "n1".into(),
+            archived: true,
+        },
+        Event::LabelsChanged {
+            at: 17,
+            labels: vec![Label {
+                id: "l1".into(),
+                name: "work".into(),
+            }],
         },
         Event::PetVisibilityChanged {
             at: 5,
@@ -160,6 +230,12 @@ mod tests {
         "AppReady",
         "AppShuttingDown",
         "SettingChanged",
+        "NoteCreated",
+        "NoteUpdated",
+        "NoteDeleted",
+        "NotePinnedChanged",
+        "NoteArchivedChanged",
+        "LabelsChanged",
         "PetVisibilityChanged",
         "PetMoved",
         "DataExported",
