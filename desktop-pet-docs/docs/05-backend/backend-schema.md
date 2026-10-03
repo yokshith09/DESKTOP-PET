@@ -163,13 +163,7 @@ Rules carried forward: writes buffered and flushed ≤1/min (ADR-005); untracked
 
 - Files: `NNN_description.sql`, embedded in the binary, applied in order
 - **The runner owns the transaction.** It issues `BEGIN`, executes the file, sets `PRAGMA user_version`, then `COMMIT`. A migration file must contain neither statement: [Certain] a `BEGIN` inside the runner's transaction fails with `cannot start a transaction within a transaction` (verified on SQLite 3.45.1), and a `user_version` written by the file can drift from the runner's bookkeeping.
-- **Lint rule for CP1 (F0-04).** Reject a migration file whose non-comment text matches:
-
-  ```
-  (?mi)^\s*(BEGIN|COMMIT|END|ROLLBACK)\s*(TRANSACTION|DEFERRED|IMMEDIATE|EXCLUSIVE)?\s*;|^\s*PRAGMA\s+user_version\s*=
-  ```
-
-  It must anchor on *standalone* transaction-control statements. A naive `BEGIN|COMMIT` search is wrong: `CREATE TRIGGER … BEGIN … END;` bodies contain both keywords, and this schema has three such triggers — the rule would reject its own migration. The regex above was checked against all three controls (flags a file that opens its own transaction, flags a `user_version` write, ignores trigger bodies).
+- **Lint rule (implemented in F0-04 as `validate_chain`).** Run the migration chain from scratch on a scratch database, each file inside an outer transaction, exactly as the runner does. Reject a file if it errors with "within a transaction" (it opened its own), if the transaction is gone afterwards (`COMMIT`/`END`/`ROLLBACK`), or if `user_version` is non-zero (it wrote the version); also reject version gaps. Executing the file is exact where a text search is not: `CREATE TRIGGER … BEGIN … END;` bodies contain the same keywords, including a bare `END;` line in a multi-line trigger, which the regex originally documented here would have wrongly flagged.
 - Version in `PRAGMA user_version`, set by the runner only
 - Before applying: copy DB to `loaf.db.bak-<from_version>`; keep last 3 backups
 - Forward-only; a broken migration is fixed by a new migration

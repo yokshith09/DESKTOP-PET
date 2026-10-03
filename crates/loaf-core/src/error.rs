@@ -82,6 +82,16 @@ impl From<std::io::Error> for AppError {
     }
 }
 
+impl From<rusqlite::Error> for AppError {
+    fn from(e: rusqlite::Error) -> Self {
+        // The driver's message can quote SQL and values, which may be user content. Keep it out
+        // of anything shown or logged; callers that can say something more helpful (a duplicate
+        // label, say) map the specific constraint themselves.
+        let _ = e;
+        Self::db("Couldn't complete that. Your data is unchanged.")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
