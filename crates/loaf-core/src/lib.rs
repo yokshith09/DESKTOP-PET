@@ -13,6 +13,7 @@ pub mod labels;
 pub mod logging;
 pub mod notes;
 pub mod scheduler;
+pub mod tasks;
 
 /// The version of the core, taken from the workspace package version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

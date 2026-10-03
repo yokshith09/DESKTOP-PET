@@ -12,6 +12,7 @@ use serde_json::Value;
 
 use crate::labels::Label;
 use crate::notes::Note;
+use crate::tasks::{Task, TaskStatus};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -57,6 +58,30 @@ pub enum Event {
     LabelsChanged {
         at: i64,
         labels: Vec<Label>,
+    },
+    TaskCreated {
+        at: i64,
+        task: Task,
+    },
+    TaskUpdated {
+        at: i64,
+        task: Task,
+    },
+    TaskStatusChanged {
+        at: i64,
+        id: String,
+        from: TaskStatus,
+        to: TaskStatus,
+    },
+    TaskDeferred {
+        at: i64,
+        id: String,
+        from_date: Option<String>,
+        to_date: String,
+    },
+    TaskDeleted {
+        at: i64,
+        id: String,
     },
     PetVisibilityChanged {
         at: i64,
@@ -106,6 +131,11 @@ impl Event {
             | Self::NotePinnedChanged { at, .. }
             | Self::NoteArchivedChanged { at, .. }
             | Self::LabelsChanged { at, .. }
+            | Self::TaskCreated { at, .. }
+            | Self::TaskUpdated { at, .. }
+            | Self::TaskStatusChanged { at, .. }
+            | Self::TaskDeferred { at, .. }
+            | Self::TaskDeleted { at, .. }
             | Self::PetVisibilityChanged { at, .. }
             | Self::PetMoved { at, .. }
             | Self::DataExported { at, .. }
@@ -129,6 +159,11 @@ impl Event {
             Self::NotePinnedChanged { .. } => "NotePinnedChanged",
             Self::NoteArchivedChanged { .. } => "NoteArchivedChanged",
             Self::LabelsChanged { .. } => "LabelsChanged",
+            Self::TaskCreated { .. } => "TaskCreated",
+            Self::TaskUpdated { .. } => "TaskUpdated",
+            Self::TaskStatusChanged { .. } => "TaskStatusChanged",
+            Self::TaskDeferred { .. } => "TaskDeferred",
+            Self::TaskDeleted { .. } => "TaskDeleted",
             Self::PetVisibilityChanged { .. } => "PetVisibilityChanged",
             Self::PetMoved { .. } => "PetMoved",
             Self::DataExported { .. } => "DataExported",
@@ -186,6 +221,30 @@ pub(crate) fn one_of_each() -> Vec<Event> {
                 name: "work".into(),
             }],
         },
+        Event::TaskCreated {
+            at: 18,
+            task: Task::sample(),
+        },
+        Event::TaskUpdated {
+            at: 19,
+            task: Task::sample(),
+        },
+        Event::TaskStatusChanged {
+            at: 20,
+            id: "t1".into(),
+            from: TaskStatus::Planned,
+            to: TaskStatus::InProgress,
+        },
+        Event::TaskDeferred {
+            at: 21,
+            id: "t1".into(),
+            from_date: Some("2026-10-03".into()),
+            to_date: "2026-10-04".into(),
+        },
+        Event::TaskDeleted {
+            at: 22,
+            id: "t1".into(),
+        },
         Event::PetVisibilityChanged {
             at: 5,
             visible: false,
@@ -236,6 +295,11 @@ mod tests {
         "NotePinnedChanged",
         "NoteArchivedChanged",
         "LabelsChanged",
+        "TaskCreated",
+        "TaskUpdated",
+        "TaskStatusChanged",
+        "TaskDeferred",
+        "TaskDeleted",
         "PetVisibilityChanged",
         "PetMoved",
         "DataExported",
