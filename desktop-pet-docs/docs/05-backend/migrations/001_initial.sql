@@ -130,7 +130,7 @@ CREATE TABLE meetings (
     title           TEXT NOT NULL CHECK (length(title) BETWEEN 1 AND 200),
     starts_at       INTEGER NOT NULL,
     notes           TEXT NOT NULL DEFAULT '',
-    transcript      TEXT,                    -- Phase 4
+    transcript      TEXT,                    -- Phase 6 (Voice)
     follow_up_date  TEXT,
     created_at      INTEGER NOT NULL,
     updated_at      INTEGER NOT NULL

@@ -1,5 +1,5 @@
 # LOAF — Product Document
-**Version 1.1** · **Status: 🔒 LOCKED (D0) · amended D0-A1**  
+**Version 1.2** · **Status: 🔒 LOCKED (D0) · amended D0-A1, D0-A2**  
 **Last updated:** October 3, 2026 (see §15 Amendments)
 
 ---
@@ -314,7 +314,7 @@ CANCELLED
 **Constraints:**
 - No automatic recording in v1
 - No transcription in v1
-- Voice transcription comes in Phase 4 (voice input), meeting transcription with it
+- Meeting transcription arrives with Voice, in Phase 6
 
 ---
 
@@ -556,7 +556,7 @@ Safari Extension ──┘
 
 ---
 
-### 4.11 Voice System (Priority P2 · Phase 4)
+### 4.11 Voice System (Priority P3 · Phase 6)
 
 **Definition:** Voice interface for creating notes, tasks, and querying workspace (uses JEV model through provider layer).
 
@@ -583,7 +583,7 @@ Microphone → Audio Buffer → Wake Detection → JEV → Intent → Action
 
 ---
 
-### 4.12 MCP Integration Layer (Priority P2 · client scaffold Phase 4 · integrations Phase 6)
+### 4.12 MCP Integration Layer (Priority P2 · Phase 5, including the MCP client scaffold and OAuth)
 
 **Definition:** Optional integration with external services through Model Context Protocol (MCP).
 
@@ -614,7 +614,7 @@ Microphone → Audio Buffer → Wake Detection → JEV → Intent → Action
 
 ---
 
-### 4.13 Developer Companion Features (Priority P2 · Phase 5)
+### 4.13 Developer Companion Features (Priority P2 · Phase 4)
 
 **Definition:** System reactions to development-specific events.
 
@@ -1017,9 +1017,9 @@ The following are explicitly **not** part of the initial release but may be adde
 - Subtasks
 - Time estimates
 - Recurring meetings
-- Meeting recording/transcription (added in Phase 4)
-- MCP integrations (client scaffold Phase 4; integrations Phase 6)
-- Voice commands (added in Phase 4)
+- Meeting recording/transcription (added in Phase 6, with Voice)
+- MCP integrations (added in Phase 5, including the client scaffold)
+- Voice commands (added in Phase 6)
 - Character customization/closet (added in Phase 7)
 - Advanced AI/ML features
 - Themes/dark mode customization (basic only)
@@ -1093,7 +1093,7 @@ The following are explicitly **not** part of the initial release but may be adde
 
 - **Owner:** [Product Manager]
 - **Last Updated:** October 3, 2026
-- **Version:** 1.1
+- **Version:** 1.2
 - **Status:** 🔒 Locked · amended (see §15)
 
 ---
@@ -1104,7 +1104,7 @@ The following are explicitly **not** part of the initial release but may be adde
 
 ## 15. Amendments
 
-### Amendment D0-A1 (2026-10-03) — phase/priority labels corrected
+### Amendment D0-A1 (2026-10-03) — phase/priority labels corrected *(phase numbers superseded by D0-A2 below)*
 
 **Problem.** §4 headings used a single `P<n>` tag for two different things. In §4.1–§4.10 it meant **priority** (P0 = must-have for v1, P1 = next), but in §4.11–§4.14 it was read as **phase**, and those phase numbers contradicted every downstream document: D0 had Voice at P3, MCP at P3–P4, Developer at P4 and Characters at P5, while `02-build-order.md` (locked), the PRD §8 table and the Implementation Plan all use Voice 4, Developer 5, MCP 6, Characters 7.
 
@@ -1123,3 +1123,20 @@ The following are explicitly **not** part of the initial release but may be adde
 §11 "Out of Scope (V1)" was corrected to match (it had MCP and voice "added in Phase 3", characters "Phase 5"), and its misleading "(v1; added in …)" prefix — which read as though the item were both in and out of v1 — was dropped.
 
 **Authority rule going forward:** phase numbering lives in `01-build-principles/02-build-order.md`. This document states priority; it defers to the build order for sequence.
+
+### Amendment D0-A2 (2026-10-03) — phase order set by the product owner
+
+**Supersedes the phase numbers in D0-A1.** D0-A1 explained D0's `P<n>` tags as priority/phase confusion and aligned phases 4–7 to the build order as it then stood. That explanation was an inference, and the owner has since decided the order directly:
+
+**Notes (1) → Browser (2) → Pet (3) → Developer (4) → MCP (5) → Voice (6) → Characters (7).**
+
+| Component | D0 original | D0-A1 | Now (D0-A2) |
+|-----------|-------------|-------|-------------|
+| §4.13 Developer Companion | P4 | Priority P2 · Phase 5 | Priority P2 · **Phase 4** |
+| §4.12 MCP Integration Layer | P3–P4 | Priority P2 · scaffold Phase 4 · integrations Phase 6 | Priority P2 · **Phase 5**, scaffold and OAuth included |
+| §4.11 Voice System | P3 | Priority P2 · Phase 4 | Priority **P3** · **Phase 6** |
+| §4.14 Character Ecosystem | P5 | Priority P3 · Phase 7 | Unchanged · Phase 7 |
+
+Scope is unchanged — nothing moved into or out of v1. Three knock-on effects, recorded in ADR-015 and `02-build-order.md` A-3: the MCP client scaffold and OAuth moved from the Voice phase to the MCP phase; Developer Companion now runs before OAuth exists, so its CI checks use a keychain-held access token; and meeting transcription follows Voice to Phase 6. §4.4 and §11 were updated to match.
+
+**Authority rule unchanged:** phase numbering lives in `01-build-principles/02-build-order.md`.

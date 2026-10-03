@@ -112,7 +112,7 @@ Append-only by product rule; deletion allowed within 5 minutes (enforced in Rust
 
 - Participants/decisions/action items are ordered by `position`.
 - `meeting_action_items.task_id` is unique (one action item → at most one task) and `ON DELETE SET NULL` (deleting the task un-links, item remains).
-- `transcript` exists now (nullable) so Phase 4 needs no migration for it.
+- `transcript` exists now (nullable) so Phase 6 (Voice) needs no migration for it.
 
 ### 3.7 `daily_logs`
 
@@ -243,3 +243,6 @@ Applied before lock, after a cross-document consistency review. Schema version s
 | 2 | `task_events.kind` allowed `'DELETED'` | Kind removed from the `CHECK` (§3.4) | [Certain] `task_id` cascades, so the row recording a deletion is destroyed by that deletion — the state was unreachable |
 | 3 | "Label names are unique case-insensitively", enforced by `UNIQUE INDEX … COLLATE NOCASE` | `labels.name_folded` column + unique index; Rust does Unicode lowercasing (§3.2) | [Certain] NOCASE folds ASCII only, so the stated guarantee did not hold for non-ASCII names |
 | 4 | §3.8 rejected triggers while ADR-006 (locked) mandated them | §3.8 cites ADR-014, which supersedes ADR-006 on the sync mechanism | ADR-006 could not be edited silently; a locked decision needs a superseding ADR |
+
+### Amendment D6-A2 (2026-10-03) — comment only
+The `meetings.transcript` comment in `001_initial.sql` and §3.6 now say Phase 6 (Voice), per ADR-015. No column, constraint or schema version changed.

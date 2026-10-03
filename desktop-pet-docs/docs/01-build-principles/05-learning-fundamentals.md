@@ -65,12 +65,12 @@ Any of these = stop, learn the concept, write it down, continue.
 
 | Concept | Phase | Done when you can… |
 |---------|-------|--------------------|
-| Audio capture & permissions | 4 | Request mic permission on both OSes, capture only on activation |
-| Intent parsing basics | 4 | Map an utterance to a structured intent with confidence + fallback |
-| OAuth 2.0 + PKCE for desktop apps | 4, 6 | Explain loopback redirect and why desktop apps can't hold a client secret |
-| MCP protocol (client side) | 4, 6 | Connect to an MCP server, list tools, call one |
-| File-system watchers | 5 | Watch `.git` without recursive overload (`notify` crate) |
-| Secure credential storage | 4, 6 | Store tokens in OS keychain / Credential Manager, never in SQLite |
+| File-system watchers | 4 | Watch `.git` without recursive overload (`notify` crate) |
+| Secure credential storage | 4, 5 | Store tokens in OS keychain / Credential Manager, never in SQLite |
+| OAuth 2.0 + PKCE for desktop apps | 5 | Explain loopback redirect and why desktop apps can't hold a client secret |
+| MCP protocol (client side) | 5 | Connect to an MCP server, list tools, call one |
+| Audio capture & permissions | 6 | Request mic permission on both OSes, capture only on activation |
+| Intent parsing basics | 6 | Map an utterance to a structured intent with confidence + fallback |
 | Asset packaging & lazy loading | 7 | Load a character pack only when selected |
 
 ## How to Learn (Without Stalling)
@@ -118,6 +118,9 @@ Before adding any crate or npm package, answer in the PR:
 ---
 
 ## Amendments
+
+### Amendment A-2 (2026-10-03)
+Phase column and row order of the "Before Phases 4–7" table follow the owner's phase order (ADR-015): Developer 4, MCP 5, Voice 6, Characters 7.
 
 ### Amendment A-1 (2026-10-03)
 The Phase 1 FTS5 row said to keep the index in sync "with triggers", echoing

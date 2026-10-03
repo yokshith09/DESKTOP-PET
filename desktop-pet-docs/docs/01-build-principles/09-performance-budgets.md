@@ -44,9 +44,9 @@ Each phase may only add to idle cost within its allocation. Unused allocation do
 | 1 Notes + minimal pet | ≤0.1% | ≤10 MB | Static pet sprite must cost ~0 CPU |
 | 2 Browser | ≤0.2% | ≤8 MB | Extensions fire on events only; buffered writes |
 | 3 Pet animations | ≤0.2% while animating, 0 while sleeping | ≤8 MB | Sprite sheets loaded once |
-| 4 Voice | 0 when not activated | ≤5 MB | No mic capture outside activation |
-| 5 Developer | ≤0.1% | ≤4 MB | Watchers on `.git` refs only, not whole trees |
-| 6 MCP | ≤0.1% | ≤5 MB | Refresh per ADR-009 exceptions |
+| 4 Developer | ≤0.1% | ≤4 MB | Watchers on `.git` refs only, not whole trees |
+| 5 MCP | ≤0.1% | ≤5 MB | Refresh per ADR-009 exceptions; also carries the MCP client + OAuth scaffold |
+| 6 Voice | 0 when not activated | ≤5 MB | No mic capture outside activation |
 | 7 Characters | 0 | ≤5 MB resident | Only the active character's assets in memory |
 | **Total** | **<1%** | **<100 MB** | |
 
@@ -97,7 +97,8 @@ If Phase 0 measures a higher baseline, later allocations shrink — the total ne
 
 ## Amendments
 
-*(None yet.)*
+### Amendment A-1 (2026-10-03)
+Per-phase allocation rows for Phases 4–6 reordered to follow the owner's phase order (ADR-015): Developer 4, MCP 5, Voice 6. Each phase keeps its own numbers; the totals (<1% CPU, <100 MB) are unchanged. Phase 5 now also hosts the MCP client and OAuth scaffold that previously sat in the Voice phase — it keeps the ≤5 MB allocation, so the start-of-phase re-estimate must show it fits.
 
 ---
 

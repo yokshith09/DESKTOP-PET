@@ -1,6 +1,6 @@
 # Architecture Decisions — ADR Log
 
-> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **ADR-014 appended 2026-10-03**. Existing ADRs change only via a new ADR that supersedes them. New ADRs may be appended at any time.
+> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **ADR-014, ADR-015 appended 2026-10-03**. Existing ADRs change only via a new ADR that supersedes them. New ADRs may be appended at any time.
 
 Each decision records **what we chose, why, what we rejected, and what it costs**. Confidence tags: [Certain] verified fact, [Likely] strong inference, [Guessing] must be verified in Phase 0.
 
@@ -87,8 +87,8 @@ Each decision records **what we chose, why, what we rejected, and what it costs*
 
 | Exception | Why no event exists | Constraint |
 |-----------|--------------------|------------|
-| CI status (Phase 5) | A desktop app cannot receive GitHub webhooks without a public endpoint | Only while a build is known to be running; exponential backoff 15 s → 5 min; stop when finished |
-| MCP integration refresh (Phase 6) | Remote services may not push to a local client | User-configurable interval, default ≥15 min, paused when idle or on battery |
+| CI status (Phase 4) | A desktop app cannot receive GitHub webhooks without a public endpoint | Only while a build is known to be running; exponential backoff 15 s → 5 min; stop when finished |
+| MCP integration refresh (Phase 5) | Remote services may not push to a local client | User-configurable interval, default ≥15 min, paused when idle or on battery |
 
 Any new exception requires a new ADR.
 
@@ -101,7 +101,7 @@ Any new exception requires a new ADR.
 
 ## ADR-011: Secrets in the OS keychain, never in SQLite
 
-**Decision:** OAuth tokens and API credentials (Phase 4+) are stored via Windows Credential Manager / macOS Keychain (e.g., `keyring` crate). SQLite stores only a reference.
+**Decision:** OAuth tokens and API credentials (Phase 4+: the Phase 4 CI access token, then Phase 5 OAuth) are stored via Windows Credential Manager / macOS Keychain (e.g., `keyring` crate). SQLite stores only a reference.
 **Why:** Data export must never leak tokens; DB file can be shared for debugging safely.
 
 ## ADR-012: Data ownership — export, delete, no telemetry
@@ -129,6 +129,22 @@ Any new exception requires a new ADR.
 **Cost / Risk:** Correctness now depends on application discipline, not the database. Three guardrails, all required (backend-schema.md §3.8): an integration test asserting a random CRUD sequence yields an index byte-identical to a from-scratch rebuild; a user-facing **Settings → Advanced → Rebuild search index**; and a startup check that rebuilds in the background when `search_map` row count ≠ entity count.
 
 **Verification:** The consistency test above is an exit-gate item for CP4 feature F1-20.
+
+---
+
+## ADR-015: Phase order revised — Developer → MCP → Voice
+
+**Status:** Accepted (2026-10-03) · **Supersedes the phase numbers** in ADR-009 and ADR-011; their decisions are unchanged.
+
+**Decision:** Post-v1 phase order is 2 Browser · 3 Pet · **4 Developer · 5 MCP · 6 Voice** · 7 Characters. ADR-009's polling exceptions are now *CI status — Phase 4* and *MCP refresh — Phase 5*. ADR-011's keychain is first used in Phase 4 (CI access token) and again in Phase 5 (OAuth tokens).
+
+**Why:** Product-owner decision. Voice follows the integrations it can query, and Developer Companion ships earlier for the developer persona (PRD P2).
+
+**Rejected:** Keeping OAuth ahead of Developer Companion. It would have preserved a clean credentials story but forced Voice, which the owner placed last among the feature phases, to carry the OAuth/MCP foundation.
+
+**Cost / Risk:** Phase 4 needs credentials before the OAuth flow exists, so it takes a pasted token (a worse UX than OAuth, but private-repo CI is the only case that needs one). Phase 5 absorbs the MCP scaffold and OAuth and is the largest post-v1 phase.
+
+**Verification:** Phase 4 acceptance includes "token never in SQLite or export"; Phase 5 re-sizes its feature list before it starts.
 
 ---
 

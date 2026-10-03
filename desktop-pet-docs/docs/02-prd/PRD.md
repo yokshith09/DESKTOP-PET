@@ -1,8 +1,8 @@
 # Loaf — Product Requirements Document (PRD)
 
-**Milestone:** D2 · **Version:** 1.1 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED — §9 decisions D-1…D-10 approved 2026-10-03
-**Derives from:** `docs/00-product/product-document.md` (D0 v1.1), `docs/01-build-principles/` (D1)
-**Changes in v1.1:** §9 approved and locked; §8 phase numbering reconciled with D0 Amendment D0-A1. See §12.
+**Milestone:** D2 · **Version:** 1.2 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED — §9 decisions D-1…D-10 approved 2026-10-03
+**Derives from:** `docs/00-product/product-document.md` (D0 v1.2), `docs/01-build-principles/` (D1)
+**Changes in v1.1:** §9 approved and locked; §8 phase numbering reconciled with D0. **v1.2:** §8 reordered to the owner's phase order (D0-A2, ADR-015). See §12.
 
 This PRD turns the Product Document into **testable requirements**. Phase 0 and Phase 1 (the first release) are specified to feature level. Phases 2–7 are specified to capability level and get their own PRD addendum before their build starts (Principle 4: one phase at a time).
 
@@ -19,7 +19,7 @@ This PRD turns the Product Document into **testable requirements**. Phase 0 and 
 | Persona | Description | Primary need |
 |---------|-------------|--------------|
 | **P1 — Student builder** (primary) | CS student juggling coursework, projects, internships, hackathons | One place for tasks + notes + "what did I do today" |
-| **P2 — Individual developer** | Works in IDE + browser all day | Low-friction capture, later dev-aware companion (Phase 5) |
+| **P2 — Individual developer** | Works in IDE + browser all day | Low-friction capture, later dev-aware companion (Phase 4) |
 | **P3 — Privacy-minded knowledge worker** | Avoids cloud tools for personal work logs | Local data, export/delete control |
 
 **Not targeted in v1:** teams, shared workspaces, mobile users, users needing cloud sync.
@@ -195,15 +195,15 @@ Authoritative numbers live in `09-performance-budgets.md`. Summary:
 
 ## 8. Later Phases — Capability Requirements (Addendum required before build)
 
-Phase numbering is authoritative in `01-build-principles/02-build-order.md` and matches D0 as amended (D0-A1).
+Phase numbering is authoritative in `01-build-principles/02-build-order.md` (Amendment A-3) and matches D0 as amended (D0-A2). Order: Browser 2 → Pet 3 → Developer 4 → MCP 5 → Voice 6 → Characters 7.
 
 | Phase | D0 component | Must deliver | Key open questions for its PRD addendum |
 |-------|--------------|-------------|------------------------------------------|
 | 2 Browser Intelligence | §4.7–4.9 | Extensions ×4, native bridge, app + domain time, open tabs with close, privacy radar, dashboard | Store URL or domain only by default? Category taxonomy? Incognito handling (must be excluded) |
 | 3 Pet & Companion | §4.6 (reactive) | Animations, event reactions (D0 §4.6.1), sleep mode, greeting, hover | Character design; reaction rate-limiting so it's never annoying |
-| 4 Voice & Integrations Foundation | §4.11, §4.12 (scaffold) | Activation-based voice, JEV provider, intents → note/task/query, MCP client scaffold, OAuth | JEV local vs API (privacy vs accuracy); TTS needed? |
-| 5 Developer Companion | §4.13 | Git watcher, build/CI state, pet reactions, task-from-failure | Which build tools detected; repo discovery UX |
-| 6 MCP Integrations | §4.12 (integrations) | Gmail, GitHub, Slack, Calendar, Notion read-only, cached locally | Data retention for cached remote data |
+| 4 Developer Companion | §4.13 | Git watcher, build/CI state (token in keychain), pet reactions, task-from-failure | Which build tools detected; repo discovery UX; pasted token vs waiting for OAuth |
+| 5 MCP Integrations | §4.12 | MCP client scaffold, OAuth, Gmail, GitHub, Slack, Calendar, Notion read-only, cached locally | Data retention for cached remote data |
+| 6 Voice | §4.11 | Activation-based voice, JEV provider, intents → note/task/query, meeting transcription | JEV local vs API (privacy vs accuracy); TTS needed? |
 | 7 Character Ecosystem | §4.14 | 18 characters, outfits, seasonal, app-specific reactions | Asset pipeline, download vs bundled |
 
 ## 9. Decisions (🔒 APPROVED 2026-10-03)
@@ -249,6 +249,9 @@ Cut from the bottom first; never cut above the line.
 ---
 
 ## 12. Amendments
+
+### Amendment D2-A2 (2026-10-03)
+§8 rows reordered and re-scoped to the owner's phase order (ADR-015): Developer 4, MCP 5 (now owns the MCP client scaffold and OAuth), Voice 6. §3 persona P2 now points at Phase 4. No Phase 0–1 requirement changed.
 
 ### Amendment D2-A1 (2026-10-03) — locked
 
