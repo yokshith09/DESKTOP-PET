@@ -4,7 +4,10 @@ name: V-2 RAM (preliminary)
 # point 1) and fails only when a run cannot be measured. It runs when the shell, the frontend or
 # the measuring scripts change — not on core-library commits — and is never cancelled by them.
 on:
-  pull_request:
+  # `push`, not `pull_request`: on a pull request GitHub filters paths against the whole PR diff,
+  # which always includes the shell, so it would run (and cancel itself) on every commit.
+  push:
+    branches-ignore: [main]
     paths:
       - "src-tauri/**"
       - "src/**"
@@ -16,7 +19,7 @@ on:
 
 concurrency:
   group: v2-ram-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false # a measurement is only useful if it finishes
 
 permissions:
   contents: read
