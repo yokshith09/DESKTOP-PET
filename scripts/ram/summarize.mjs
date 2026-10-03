@@ -112,8 +112,13 @@ export function summarizeSamples(samples) {
   return { maxBytes, meanBytes, peak, maxResidentBytes, verdict: verdict(maxBytes) };
 }
 
+/** `{ os, webview, commit }` → "Windows 10.0.26100, WebView2 142.0.3595.65, commit 7b19c2d"; missing parts are skipped. */
+export function describeEnvironment({ os, webview, commit } = {}) {
+  return [os, webview ? `webview ${webview}` : null, commit ? `commit ${commit}` : null].filter(Boolean).join(", ");
+}
+
 export function renderMarkdown(report) {
-  const { platform, metric, settleSeconds, intervalSeconds, samples } = report;
+  const { platform, metric, settleSeconds, intervalSeconds, samples, environment } = report;
   const s = summarizeSamples(samples);
   const hasResident = s.maxResidentBytes !== null;
   const rows = s.peak.procs
@@ -127,6 +132,7 @@ export function renderMarkdown(report) {
     "",
     `Sum across all Loaf processes: **max ${mb1(s.maxBytes)} MB**, mean ${mb1(s.meanBytes)} MB over ${samples.length} samples ` +
       `(${settleSeconds}s settle, every ${intervalSeconds}s). Metric: ${metric}.`,
+    environment ? `Environment: ${describeEnvironment(environment)}.` : "",
     "",
     hasResident
       ? `Secondary, for context only (the gate stays on the figure above): **private working set max ${mb1(s.maxResidentBytes)} MB** — resident private memory, closer to what Task Manager shows. Private bytes counts committed pages that may never have been touched.`

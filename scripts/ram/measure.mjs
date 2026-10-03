@@ -4,6 +4,7 @@
 // Polling here is tooling, not product code; Principle 1 governs the app, not its test rig.
 import { execFileSync, spawn } from "node:child_process";
 import { appendFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
   parseFootprint,
@@ -71,6 +72,28 @@ function applyFootprint(members) {
   return { members: out, metric: allParsed ? "physical footprint" : "RSS (footprint unavailable for some processes)" };
 }
 
+/** Best-effort facts that explain a number later; a failure here must never stop the measurement. */
+function environment() {
+  const attempt = (f) => {
+    try {
+      return f().trim() || null;
+    } catch {
+      return null;
+    }
+  };
+  const webview =
+    platform === "win32"
+      ? attempt(() =>
+          ps("(Get-ItemProperty 'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' -ErrorAction SilentlyContinue).pv"),
+        )
+      : attempt(() => `WebKit (macOS ${run("sw_vers", ["-productVersion"])})`);
+  return {
+    os: `${platform === "win32" ? "Windows" : "macOS"} ${os.release()}`,
+    webview: webview && platform === "win32" ? `WebView2 ${webview}` : webview,
+    commit: process.env.GITHUB_SHA ? process.env.GITHUB_SHA.slice(0, 7) : null,
+  };
+}
+
 const baseline = new Set(listProcesses().map((p) => p.pid));
 const child = spawn(exe, [], { stdio: "ignore", detached: false });
 child.on("error", (e) => {
@@ -130,7 +153,7 @@ if (error) {
   process.exit(1);
 }
 
-const report = { platform, metric, settleSeconds: settle, intervalSeconds: interval, samples, summary: summarizeSamples(samples) };
+const report = { platform, metric, settleSeconds: settle, intervalSeconds: interval, environment: environment(), samples, summary: summarizeSamples(samples) };
 const md = renderMarkdown(report);
 writeFileSync(`${outBase}.json`, JSON.stringify(report, null, 2));
 writeFileSync(`${outBase}.md`, md);

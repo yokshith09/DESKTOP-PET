@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   descendants,
+  describeEnvironment,
   parseFootprint,
   parsePs,
   parseWindows,
@@ -191,5 +192,23 @@ describe("secondary resident metric (Windows private working set)", () => {
       samples: [{ t: 0, totalBytes: 50 * MB, residentTotalBytes: null, procs: [{ pid: 1, name: "a", bytes: 50 * MB }] }],
     });
     assert.doesNotMatch(only, /working set/i);
+  });
+});
+
+describe("environment line", () => {
+  it("describes the runner so a number can be interpreted later", () => {
+    assert.equal(
+      describeEnvironment({ os: "Windows 10.0.26100", webview: "WebView2 142.0.3595.65", commit: "7b19c2d" }),
+      "Windows 10.0.26100, webview WebView2 142.0.3595.65, commit 7b19c2d",
+    );
+  });
+  it("skips whatever could not be determined instead of printing null", () => {
+    assert.equal(describeEnvironment({ os: "macOS 25.0.0", webview: null, commit: null }), "macOS 25.0.0");
+    assert.equal(describeEnvironment(), "");
+  });
+  it("appears in the report when known and is omitted when not", () => {
+    const base = { platform: "win32", metric: "private bytes", settleSeconds: 120, intervalSeconds: 30, samples: [{ t: 0, totalBytes: 50 * 1048576, procs: [{ pid: 1, name: "a", bytes: 50 * 1048576 }] }] };
+    assert.match(renderMarkdown({ ...base, environment: { os: "Windows 10.0.1", commit: "abc1234" } }), /Environment: Windows 10\.0\.1, commit abc1234\./);
+    assert.doesNotMatch(renderMarkdown(base), /Environment:/);
   });
 });
