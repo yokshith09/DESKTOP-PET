@@ -49,4 +49,18 @@ export type ErrorCode =
 export interface AppError { code: ErrorCode; message: string; field?: string }
 
 /** One bus event as forwarded by the shell; only the tag matters to the UI. */
-export interface LoafEvent { type: string; at: number }
+export interface LoafEvent { type: string; at: number; [field: string]: unknown }
+
+export interface BinNote extends NoteSummary { deleted_at: number }
+
+export interface Reminder {
+  id: string;
+  title: string;
+  remind_at: number;
+  note_id: string | null;
+  fired_at: number | null;
+  done_at: number | null;
+  created_at: number;
+}
+export interface ReminderInput { title: string; remind_at: number; note_id?: string | null }
+export interface ReminderPatch { title?: string; remind_at?: number }

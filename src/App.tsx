@@ -1,99 +1,117 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ArrowDownUp, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Clock3, Plug } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useBusSync, useLabels, useNoteActions, useNotes, useTodayTasks } from "@/hooks/useLoaf";
+import { useBin, useBusSync, useLabels, useNoteActions, useNotes, useTodayTasks } from "@/hooks/useLoaf";
 import { useTheme } from "@/hooks/useTheme";
-import type { NoteSort } from "@/ipc";
+import { ipc, type NoteSort } from "@/ipc";
+import { BinPage } from "@/features/bin/BinPage";
+import { CharacterPage } from "@/features/character/CharacterPage";
 import { NoteEditor } from "@/features/notes/NoteEditor";
-import { NotesBoard } from "@/features/notes/NotesBoard";
-import { TodayCard } from "@/features/tasks/TodayCard";
-import { Hero } from "@/features/shell/Hero";
-import { Sidebar, type View } from "@/features/shell/Sidebar";
+import { NotesPage } from "@/features/notes/NotesPage";
+import type { NotesLayout } from "@/features/notes/NotesBoard";
+import { SettingsPage } from "@/features/settings/SettingsPage";
+import { ComingSoon } from "@/features/shell/ComingSoon";
+import { Sidebar, type Page } from "@/features/shell/Sidebar";
+import { TopBar } from "@/features/shell/TopBar";
+import { TodayPage } from "@/features/tasks/TodayPage";
 
-const SORTS: Record<NoteSort, string> = { last_edited: "Last edited", created: "Date created", color: "Colour" };
+const PAGES: readonly Page[] = ["today", "time", "notes", "archive", "bin", "character", "mcp", "settings"];
 
 function Screen() {
-  const [view, setView] = useState<View>("notes");
+  const [page, setPageState] = useState<Page>("notes");
   const [labelId, setLabelId] = useState<string | null>(null);
   const [sort, setSort] = useState<NoteSort>("last_edited");
+  const [layout, setLayoutState] = useState<NotesLayout>("grid");
   const [editing, setEditing] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useBusSync();
   const theme = useTheme();
   const actions = useNoteActions();
-  const archived = view === "archive";
-  const { data: notes = [] } = useNotes(archived, labelId, sort);
   const { data: allNotes = [] } = useNotes(false, null, "last_edited");
   const { data: labels = [] } = useLabels();
   const { data: tasks = [] } = useTodayTasks();
+  const { data: bin = [] } = useBin();
+
+  // Restore where the person left off (ui.last_view, ui.notes_layout).
+  useEffect(() => {
+    void ipc.prefsGet<Page>("ui.last_view").then((p) => p && PAGES.includes(p) && setPageState(p));
+    void ipc.prefsGet<NotesLayout>("ui.notes_layout").then((l) => (l === "grid" || l === "list") && setLayoutState(l));
+  }, []);
+  const setPage = (p: Page) => {
+    setPageState(p);
+    void ipc.prefsSet("ui.last_view", p);
+  };
+  const setLayout = (l: NotesLayout) => {
+    setLayoutState(l);
+    void ipc.prefsSet("ui.notes_layout", l);
+  };
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query), 150);
+    return () => clearTimeout(t);
+  }, [query]);
 
   const newNote = async () => {
     const note = await actions.create({ label_ids: labelId ? [labelId] : [] });
-    setView("notes");
+    if (page !== "notes") setPage("notes");
     setEditing(note.id);
+  };
+  const onQuery = (q: string) => {
+    setQuery(q);
+    if (q.trim() && page !== "notes" && page !== "archive") setPage("notes");
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "n") {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "n") {
         e.preventDefault();
         void newNote();
+      } else if (k === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const heading = archived ? "Archive" : labelId ? (labels.find((l) => l.label.id === labelId)?.label.name ?? "Notes") : "Notes";
-  const showDashboard = !archived && labelId === null;
+  const labelName = labelId ? labels.find((l) => l.label.id === labelId)?.label.name : undefined;
 
   return (
     <div className="flex h-screen min-h-[600px] bg-background text-foreground">
       <Sidebar
-        view={view} labelId={labelId} labels={labels} noteCount={allNotes.length} isDark={theme.isDark}
-        onView={setView} onLabel={setLabelId} onToggleTheme={() => void theme.toggle()}
+        page={page} labelId={labelId} labels={labels}
+        counts={{ today: tasks.length, notes: allNotes.length, bin: bin.length }}
+        onPage={setPage} onLabel={setLabelId}
       />
-      <main className="min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1400px] space-y-8 px-8 py-7">
-          {showDashboard && (
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-              <Hero noteCount={allNotes.length} openTasks={tasks.length} onNew={() => void newNote()} />
-              <TodayCard />
-            </div>
-          )}
-          <div>
-            <div className="mb-5 flex items-center gap-3">
-              <h2 className="text-2xl font-bold tracking-tight">{heading}</h2>
-              <div className="ml-auto flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm"><ArrowDownUp />{SORTS[sort]}</Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuRadioGroup value={sort} onValueChange={(v) => setSort(v as NoteSort)}>
-                      {(Object.keys(SORTS) as NoteSort[]).map((s) => (
-                        <DropdownMenuRadioItem key={s} value={s}>{SORTS[s]}</DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                {!showDashboard && !archived && <Button size="sm" onClick={() => void newNote()}><Plus />New note</Button>}
-              </div>
-            </div>
-            <NotesBoard
-              notes={notes} archived={archived} filtered={labelId !== null} onNew={() => void newNote()}
-              onOpen={setEditing} onPin={(id, p) => void actions.pin(id, p)}
-              onArchive={(id, a) => void actions.archive(id, a)} onDelete={(id) => void actions.remove(id)}
-            />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar ref={searchRef} query={query} onQuery={onQuery} isDark={theme.isDark} onToggleTheme={() => void theme.toggle()} onNewNote={() => void newNote()} />
+        <main className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-[1280px] px-6 py-6">
+            {(page === "notes" || page === "archive") && (
+              <NotesPage
+                archived={page === "archive"} labelId={page === "notes" ? labelId : null} {...(labelName ? { labelName } : {})}
+                query={debounced} sort={sort} layout={layout} onSort={setSort} onLayout={setLayout}
+                onOpen={setEditing} onNew={() => void newNote()} onOpenToday={() => setPage("today")}
+              />
+            )}
+            {page === "today" && <TodayPage />}
+            {page === "bin" && <BinPage />}
+            {page === "character" && <CharacterPage />}
+            {page === "settings" && <SettingsPage />}
+            {page === "time" && <ComingSoon icon={<Clock3 />} title="Time" description="Daily logs and time tracking will live here. Tell us what you want to see first." />}
+            {page === "mcp" && <ComingSoon icon={<Plug />} title="MCP" description="Connect external tools and services to Loaf through the Model Context Protocol. This arrives in a later release." />}
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
       <NoteEditor noteId={editing} onClose={() => setEditing(null)} />
       <Toaster />
     </div>

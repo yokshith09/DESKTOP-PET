@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { greeting, timeAgo } from "./time";
+import { formatWhen, fromLocalInput, greeting, timeAgo, toLocalInput } from "./time";
 
 describe("timeAgo", () => {
   const now = 1_000_000_000_000;
@@ -18,5 +18,19 @@ describe("greeting", () => {
     expect(greeting(9)).toBe("Good morning");
     expect(greeting(14)).toBe("Good afternoon");
     expect(greeting(20)).toBe("Good evening");
+  });
+});
+
+describe("formatWhen", () => {
+  const base = new Date(2026, 9, 4, 12, 0).getTime();
+  it("names today and tomorrow", () => {
+    expect(formatWhen(new Date(2026, 9, 4, 15, 30).getTime(), base)).toMatch(/^Today /);
+    expect(formatWhen(new Date(2026, 9, 5, 9, 0).getTime(), base)).toMatch(/^Tomorrow /);
+    expect(formatWhen(new Date(2026, 9, 3, 9, 0).getTime(), base)).toMatch(/^Yesterday /);
+    expect(formatWhen(new Date(2026, 9, 9, 9, 0).getTime(), base)).toContain("·");
+  });
+  it("round-trips the datetime-local value", () => {
+    const t = new Date(2026, 9, 4, 15, 30).getTime();
+    expect(fromLocalInput(toLocalInput(t))).toBe(t);
   });
 });

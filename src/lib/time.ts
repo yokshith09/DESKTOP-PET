@@ -15,3 +15,23 @@ export function greeting(hour: number): string {
   if (hour < 18) return "Good afternoon";
   return "Good evening";
 }
+
+const clock = (d: Date) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+/** "Today 3:30 PM", "Tomorrow 9:00 AM", "Mon, Oct 6 · 9:00 AM"; past times are prefixed by the caller. */
+export function formatWhen(ms: number, now = Date.now()): string {
+  const d = new Date(ms);
+  const days = Math.round((startOfDay(d) - startOfDay(new Date(now))) / 86_400_000);
+  if (days === 0) return `Today ${clock(d)}`;
+  if (days === 1) return `Tomorrow ${clock(d)}`;
+  if (days === -1) return `Yesterday ${clock(d)}`;
+  return `${d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} · ${clock(d)}`;
+}
+
+/** Value for <input type="datetime-local"> in local time. */
+export function toLocalInput(ms: number): string {
+  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60_000);
+  return d.toISOString().slice(0, 16);
+}
+export const fromLocalInput = (v: string): number => new Date(v).getTime();

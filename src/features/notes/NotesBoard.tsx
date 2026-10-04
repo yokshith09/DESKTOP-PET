@@ -1,72 +1,75 @@
-import { Pin, Plus } from "lucide-react";
+import { NotebookPen, Pin, Plus, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Bear } from "@/features/shell/Bear";
 import type { NoteSummary } from "@/ipc";
-import { NoteCard } from "./NoteCard";
+import { NoteCard, NoteRow, type NoteHandlers } from "./NoteCard";
 
-interface Handlers {
-  onOpen: (id: string) => void;
-  onPin: (id: string, pinned: boolean) => void;
-  onArchive: (id: string, archived: boolean) => void;
-  onDelete: (id: string) => void;
+export type NotesLayout = "grid" | "list";
+
+function Section({ title, icon, count, children }: { title: string; icon?: React.ReactNode; count: number; children: React.ReactNode }) {
+  return (
+    <section aria-label={title}>
+      <h2 className="mb-2.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        {icon}
+        {title}
+        <span className="tabular-nums text-muted-foreground/70">{count}</span>
+      </h2>
+      {children}
+    </section>
+  );
 }
 
-const COLUMNS = "gap-4 [columns:17rem]";
+function Items({ notes, layout, ...h }: { notes: NoteSummary[]; layout: NotesLayout } & NoteHandlers) {
+  if (layout === "list") {
+    return (
+      <div className="divide-y overflow-hidden rounded-xl border bg-card">
+        {notes.map((n) => <NoteRow key={n.id} note={n} {...h} />)}
+      </div>
+    );
+  }
+  return <div className="gap-3 [columns:16rem]">{notes.map((n) => <NoteCard key={n.id} note={n} {...h} />)}</div>;
+}
 
-function Grid({ notes, ...h }: { notes: NoteSummary[] } & Handlers) {
+export function Empty({ icon, title, hint, action }: { icon: React.ReactNode; title: string; hint: string; action?: React.ReactNode }) {
   return (
-    <div className={COLUMNS}>
-      {notes.map((n) => (
-        <NoteCard key={n.id} note={n} {...h} />
-      ))}
+    <div className="flex flex-col items-center rounded-xl border border-dashed px-6 py-14 text-center">
+      <span className="mb-3 grid size-10 place-items-center rounded-lg bg-muted text-muted-foreground [&_svg]:size-5">{icon}</span>
+      <p className="text-sm font-medium">{title}</p>
+      <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">{hint}</p>
+      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }
 
-function SectionTitle({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
-  return (
-    <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-      {icon}
-      {children}
-    </h2>
-  );
-}
-
 export function NotesBoard({
-  notes, archived, filtered, onNew, ...h
-}: { notes: NoteSummary[]; archived: boolean; filtered: boolean; onNew: () => void } & Handlers) {
+  notes, layout, mode, onNew, ...h
+}: { notes: NoteSummary[]; layout: NotesLayout; mode: "notes" | "archive" | "label" | "search"; onNew: () => void } & NoteHandlers) {
   if (notes.length === 0) {
+    if (mode === "search") return <Empty icon={<SearchX />} title="No matching notes" hint="Try a different word, or check the Archive." />;
+    if (mode === "archive") return <Empty icon={<NotebookPen />} title="Nothing archived" hint="Archive a note to tuck it away without deleting it." />;
+    if (mode === "label") return <Empty icon={<NotebookPen />} title="No notes with this label" hint="Add the label to a note from its editor." />;
     return (
-      <div className="grid place-items-center rounded-2xl border border-dashed py-16 text-center">
-        <Bear pose="sleep" className="mb-3 size-28 opacity-90" />
-        <p className="max-w-sm text-balance text-muted-foreground">
-          {archived
-            ? "Archived notes live here. Archive a note to tuck it away without deleting it."
-            : filtered
-              ? "No notes with this label yet."
-              : "Notes you write live here. Press Ctrl+N to start one."}
-        </p>
-        {!archived && !filtered && (
-          <Button className="mt-5" onClick={onNew}><Plus />New note</Button>
-        )}
-      </div>
+      <Empty
+        icon={<NotebookPen />}
+        title="No notes yet"
+        hint="Notes you write live here. Press Ctrl+N to start one."
+        action={<Button onClick={onNew}><Plus />New note</Button>}
+      />
     );
   }
-  const pinned = archived ? [] : notes.filter((n) => n.pinned);
-  const rest = archived ? notes : notes.filter((n) => !n.pinned);
+  const split = mode === "notes" || mode === "label";
+  const pinned = split ? notes.filter((n) => n.pinned) : [];
+  const rest = split ? notes.filter((n) => !n.pinned) : notes;
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       {pinned.length > 0 && (
-        <section aria-label="Pinned notes">
-          <SectionTitle icon={<Pin className="size-3.5 rotate-45" />}>Pinned</SectionTitle>
-          <Grid notes={pinned} {...h} />
-        </section>
+        <Section title="Pinned" icon={<Pin className="size-3 rotate-45" />} count={pinned.length}>
+          <Items notes={pinned} layout={layout} {...h} />
+        </Section>
       )}
       {rest.length > 0 && (
-        <section aria-label={pinned.length ? "Other notes" : "Notes"}>
-          {pinned.length > 0 && <SectionTitle>Others</SectionTitle>}
-          <Grid notes={rest} {...h} />
-        </section>
+        <Section title={pinned.length ? "Other notes" : mode === "search" ? "Results" : "Notes"} count={rest.length}>
+          <Items notes={rest} layout={layout} {...h} />
+        </Section>
       )}
     </div>
   );

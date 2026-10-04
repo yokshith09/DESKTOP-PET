@@ -17,7 +17,7 @@ afterEach(cleanup);
 describe("Notes screen (against the in-memory shell)", () => {
   it("shows pinned notes apart from the rest, and the Today card", async () => {
     render(<App />);
-    const pinned = await screen.findByRole("region", { name: "Pinned notes" });
+    const pinned = await screen.findByRole("region", { name: "Pinned" });
     expect(within(pinned).getByRole("button", { name: "Loaf v1 scope" })).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "Other notes" })).getByRole("button", { name: "Groceries" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Today" })).toBeTruthy();
@@ -29,7 +29,7 @@ describe("Notes screen (against the in-memory shell)", () => {
     const card = await screen.findByRole("button", { name: "Shortcuts I want" });
     await user.click(within(card).getByRole("button", { name: "Unpin" }));
     await waitFor(() => {
-      const pinned = screen.getByRole("region", { name: "Pinned notes" });
+      const pinned = screen.getByRole("region", { name: "Pinned" });
       expect(within(pinned).queryByRole("button", { name: "Shortcuts I want" })).toBeNull();
     });
   });
@@ -41,5 +41,34 @@ describe("Notes screen (against the in-memory shell)", () => {
     await user.click(within(card).getByRole("button", { name: "Delete" }));
     await user.click(await screen.findByRole("button", { name: "Undo" }));
     expect(await screen.findByRole("button", { name: "Groceries" })).toBeTruthy();
+  });
+
+  it("searches notes by text", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Groceries" });
+    await user.type(screen.getByRole("textbox", { name: "Search notes" }), "peanut");
+    expect(await screen.findByRole("heading", { name: /Results for/ })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Friday prep" })).toBeNull());
+    expect(screen.getByRole("button", { name: "Groceries" })).toBeTruthy();
+  });
+
+  it("restores a note from the Bin tab", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("tab", { name: /Bin/ }));
+    expect(await screen.findByText(/Old grocery list/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /Restore “Old grocery list”/ }));
+    expect(await screen.findByRole("button", { name: "Old grocery list" })).toBeTruthy();
+  });
+
+  it("adds a reminder", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("Stand-up");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.type(await screen.findByLabelText("Remind me to"), "Water the plants");
+    await user.click(screen.getByRole("button", { name: "Set reminder" }));
+    expect(await screen.findByText("Water the plants")).toBeTruthy();
   });
 });

@@ -39,6 +39,8 @@ function EditorBody({ note, onClose }: { note: Note; onClose: () => void }) {
   const latest = useRef({ title, body });
   latest.current = { title, body };
   const dirty = useRef(false);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const flush = async () => {
     clearTimeout(timer.current);
@@ -77,6 +79,12 @@ function EditorBody({ note, onClose }: { note: Note; onClose: () => void }) {
     <DialogContent
       data-note-color={note.color}
       aria-describedby="note-editor-desc"
+      onOpenAutoFocus={(e) => {
+        e.preventDefault();
+        const el = note.title ? bodyRef.current : titleRef.current;
+        el?.focus();
+        el?.setSelectionRange(el.value.length, el.value.length);
+      }}
       onInteractOutside={(e) => {
         e.preventDefault();
         void close();
@@ -92,7 +100,7 @@ function EditorBody({ note, onClose }: { note: Note; onClose: () => void }) {
       <DialogDescription id="note-editor-desc" className="sr-only">Changes save automatically.</DialogDescription>
       <div className="flex flex-col gap-1 px-6 pb-2 pt-6">
         <Input
-          autoFocus={!note.title && !note.body ? true : undefined}
+          ref={titleRef}
           value={title}
           maxLength={TITLE_MAX}
           onChange={(e) => edit({ title: e.target.value })}
@@ -101,6 +109,7 @@ function EditorBody({ note, onClose }: { note: Note; onClose: () => void }) {
           className="h-auto border-0 bg-transparent px-0 text-xl font-semibold tracking-tight shadow-none focus-visible:ring-0"
         />
         <textarea
+          ref={bodyRef}
           value={body}
           maxLength={BODY_MAX}
           onChange={(e) => edit({ body: e.target.value })}

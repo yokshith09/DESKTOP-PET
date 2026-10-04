@@ -8,6 +8,9 @@ export const keys = {
   note: (id: string) => ["note", id] as const,
   labels: ["labels"] as const,
   tasks: ["tasks", "today"] as const,
+  search: (q: string, archived: boolean) => ["notes", "search", q, archived] as const,
+  bin: ["bin"] as const,
+  reminders: ["reminders"] as const,
   settings: ["settings"] as const,
 };
 
@@ -18,7 +21,13 @@ export function useBusSync() {
     () =>
       onEvent((e) => {
         if (e.type === "ResyncRequired") return void qc.invalidateQueries();
+        if (e.type === "ReminderDue") {
+          const r = e.reminder as { title?: string } | undefined;
+          toast(r?.title ?? "Reminder", { description: "Reminder is due" });
+        }
+        if (e.type.startsWith("Reminder")) void qc.invalidateQueries({ queryKey: keys.reminders });
         if (e.type.startsWith("Note") || e.type === "LabelsChanged") {
+          void qc.invalidateQueries({ queryKey: keys.bin });
           void qc.invalidateQueries({ queryKey: ["notes"] });
           void qc.invalidateQueries({ queryKey: ["note"] });
           void qc.invalidateQueries({ queryKey: keys.labels });
@@ -32,6 +41,11 @@ export function useBusSync() {
 
 export const useNotes = (archived: boolean, labelId: string | null, sort: NoteSort) =>
   useQuery({ queryKey: keys.notes(archived, labelId, sort), queryFn: () => ipc.notesList(archived, labelId, sort) });
+export const useSearch = (q: string, archived: boolean) =>
+  useQuery({ queryKey: keys.search(q, archived), queryFn: () => ipc.notesSearch(q, archived), enabled: q.trim().length > 0 });
+export const useBin = () => useQuery({ queryKey: keys.bin, queryFn: ipc.binList });
+export const useReminders = (includeDone = false) =>
+  useQuery({ queryKey: [...keys.reminders, includeDone], queryFn: () => ipc.remindersList(includeDone) });
 export const useLabels = () => useQuery({ queryKey: keys.labels, queryFn: ipc.labelsList });
 export const useTodayTasks = () => useQuery({ queryKey: keys.tasks, queryFn: () => ipc.tasksQuery("today") });
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: ipc.settingsGetAll });
@@ -45,7 +59,7 @@ function useAction<A extends unknown[], R>(fn: (...a: A) => Promise<R>, invalida
   });
 }
 
-const NOTE_KEYS = [["notes"], ["note"], ["labels"]] as const;
+const NOTE_KEYS = [["notes"], ["note"], ["labels"], ["bin"]] as const;
 
 export function useNoteActions() {
   const create = useAction((input: NoteInput) => ipc.noteCreate(input), NOTE_KEYS);
@@ -53,7 +67,9 @@ export function useNoteActions() {
   const pin = useAction((id: string, pinned: boolean) => ipc.noteSetPinned(id, pinned), NOTE_KEYS);
   const archive = useAction((id: string, archived: boolean) => ipc.noteSetArchived(id, archived), NOTE_KEYS);
   const remove = useAction((id: string) => ipc.noteDelete(id), NOTE_KEYS);
-  const restore = useAction((note: Awaited<ReturnType<typeof ipc.noteDelete>>) => ipc.noteRestore(note), NOTE_KEYS);
+  const restore = useAction((id: string) => ipc.noteRestore(id), NOTE_KEYS);
+  const purge = useAction((id: string) => ipc.notePurge(id), NOTE_KEYS);
+  const emptyBin = useAction(() => ipc.binEmpty(), NOTE_KEYS);
   const discard = useAction((id: string) => ipc.noteDiscardIfEmpty(id), NOTE_KEYS);
   const createLabel = useAction((name: string) => ipc.labelCreate(name), [["labels"]]);
   return {
@@ -64,8 +80,11 @@ export function useNoteActions() {
     /** Deletes, then offers Undo (restores the exact snapshot). */
     remove: async (id: string) => {
       const gone = await remove.mutateAsync([id]);
-      toast("Note deleted", { action: { label: "Undo", onClick: () => void restore.mutateAsync([gone]) } });
+      toast("Moved to Bin", { action: { label: "Undo", onClick: () => void restore.mutateAsync([gone.id]) } });
     },
+    restore: (id: string) => restore.mutateAsync([id]),
+    purge: (id: string) => purge.mutateAsync([id]),
+    emptyBin: () => emptyBin.mutateAsync([]),
     discardIfEmpty: (id: string) => discard.mutateAsync([id]),
     createLabel: (name: string) => createLabel.mutateAsync([name]),
   };
@@ -77,5 +96,17 @@ export function useTaskActions() {
   return {
     quickAdd: (title: string) => quickAdd.mutateAsync([title]),
     setDone: (id: string, done: boolean) => move.mutateAsync([id, done ? "COMPLETED" : "PLANNED"]),
+  };
+}
+
+export function useReminderActions() {
+  const keysToRefresh = [["reminders"]] as const;
+  const create = useAction((title: string, remindAt: number) => ipc.reminderCreate({ title, remind_at: remindAt }), keysToRefresh);
+  const done = useAction((id: string, d: boolean) => ipc.reminderSetDone(id, d), keysToRefresh);
+  const remove = useAction((id: string) => ipc.reminderDelete(id), keysToRefresh);
+  return {
+    create: (title: string, remindAt: number) => create.mutateAsync([title, remindAt]),
+    setDone: (id: string, d: boolean) => done.mutateAsync([id, d]),
+    remove: (id: string) => remove.mutateAsync([id]),
   };
 }

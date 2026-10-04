@@ -4,12 +4,12 @@ import { cn } from "@/lib/utils";
 export type BearPose = "idle" | "wave" | "sleep";
 
 /** Loaf the bear: a shaded SVG that reads as 3D. Shipped as a flat image in the pet window. */
-export function Bear({ pose = "idle", className }: { pose?: BearPose; className?: string }) {
+export function Bear({ pose = "idle", className, style }: { pose?: BearPose; className?: string; style?: React.CSSProperties }) {
   const u = useId().replace(/:/g, "");
   const g = (name: string) => `${name}-${u}`;
   const url = (name: string) => `url(#${g(name)})`;
   return (
-    <svg viewBox="0 0 200 200" role="img" aria-label="Loaf the bear" className={cn("overflow-visible", className)}>
+    <svg viewBox="0 0 200 200" role="img" aria-label="Loaf the bear" className={cn("overflow-visible", className)} style={style}>
       <defs>
         <radialGradient id={g("fur")} cx="35%" cy="25%" r="85%"><stop offset="0" stopColor="#F6D3A4" /><stop offset=".45" stopColor="#E0A163" /><stop offset="1" stopColor="#A9672F" /></radialGradient>
         <radialGradient id={g("dark")} cx="35%" cy="25%" r="90%"><stop offset="0" stopColor="#E7B27A" /><stop offset="1" stopColor="#93561F" /></radialGradient>

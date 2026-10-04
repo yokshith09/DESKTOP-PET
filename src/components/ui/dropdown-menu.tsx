@@ -14,7 +14,7 @@ export const DropdownMenuContent = forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        "z-50 min-w-40 rounded-xl border bg-popover p-1 text-popover-foreground shadow-xl shadow-black/20 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+        "z-50 min-w-40 rounded-lg border bg-popover p-1 text-popover-foreground shadow-xl shadow-black/20 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
         className,
       )}
       {...props}
@@ -30,7 +30,7 @@ export const DropdownMenuItem = forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-foreground/8 [&_svg]:size-4 [&_svg]:text-muted-foreground",
+      "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-foreground/8 [&_svg]:size-4 [&_svg]:text-muted-foreground",
       destructive && "text-destructive data-[highlighted]:bg-destructive/15 [&_svg]:text-destructive",
       className,
     )}
@@ -68,7 +68,7 @@ export const DropdownMenuRadioItem = forwardRef<
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center gap-2 rounded-lg py-1.5 pl-7 pr-2.5 text-sm outline-none data-[highlighted]:bg-foreground/8",
+      "relative flex cursor-default select-none items-center gap-2 rounded-md py-1.5 pl-7 pr-2.5 text-[13px] outline-none data-[highlighted]:bg-foreground/8",
       className,
     )}
     {...props}

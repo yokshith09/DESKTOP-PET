@@ -1,7 +1,7 @@
 // Typed IPC client (F0-07): the only place that knows command names and argument shapes.
 import { call } from "./transport";
 import type {
-  Label, LabelCount, Note, NoteInput, NotePatch, NoteSort, NoteSummary, Task, TaskRow,
+  BinNote, Reminder, ReminderInput, ReminderPatch, Label, LabelCount, Note, NoteInput, NotePatch, NoteSort, NoteSummary, Task, TaskRow,
   TaskStatus, TaskView,
 } from "./types";
 import type { Settings, SettingsKey } from "./settings";
@@ -22,7 +22,17 @@ export const ipc = {
   noteSetArchived: (id: string, archived: boolean) =>
     call<Note>("note_set_archived", { id, archived }),
   noteDelete: (id: string) => call<Note>("note_delete", { id }),
-  noteRestore: (note: Note) => call<Note>("note_restore", { note }),
+  noteRestore: (id: string) => call<Note>("note_restore", { id }),
+  notesSearch: (query: string, archived: boolean) => call<NoteSummary[]>("notes_search", { query, archived }),
+  binList: () => call<BinNote[]>("bin_list"),
+  notePurge: (id: string) => call<unknown>("note_purge", { id }),
+  binEmpty: () => call<number>("bin_empty"),
+
+  remindersList: (includeDone: boolean) => call<Reminder[]>("reminders_list", { includeDone }),
+  reminderCreate: (input: ReminderInput) => call<Reminder>("reminder_create", { input }),
+  reminderUpdate: (id: string, patch: ReminderPatch) => call<Reminder>("reminder_update", { id, patch }),
+  reminderSetDone: (id: string, done: boolean) => call<Reminder>("reminder_set_done", { id, done }),
+  reminderDelete: (id: string) => call<unknown>("reminder_delete", { id }),
   noteDiscardIfEmpty: (id: string) => call<boolean>("note_discard_if_empty", { id }),
 
   labelsList: () => call<LabelCount[]>("labels_list"),

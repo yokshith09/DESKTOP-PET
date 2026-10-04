@@ -1,75 +1,103 @@
-import { Archive, Moon, NotebookPen, Sun, Tag } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Archive, CalendarCheck2, Clock3, NotebookPen, PawPrint, Plug, Settings, Tag, Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LabelCount } from "@/ipc";
 import { Bear } from "./Bear";
 
-export type View = "notes" | "archive";
+export type Page = "today" | "time" | "notes" | "archive" | "bin" | "character" | "mcp" | "settings";
 
 interface Props {
-  view: View;
+  page: Page;
   labelId: string | null;
   labels: LabelCount[];
-  noteCount: number;
-  isDark: boolean;
-  onView: (v: View) => void;
+  counts: { today: number; notes: number; bin: number };
+  onPage: (p: Page) => void;
   onLabel: (id: string | null) => void;
-  onToggleTheme: () => void;
 }
 
-function Item({ active, onClick, icon, children, count }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode; count?: number }) {
+function Item({
+  active, onClick, icon, children, count,
+}: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode; count?: number }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-4",
-        active ? "bg-foreground/10 text-foreground shadow-[inset_3px_0_0_var(--primary)]" : "text-muted-foreground hover:bg-foreground/6 hover:text-foreground",
+        "group relative flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-4 [&_svg]:shrink-0",
+        active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
       )}
     >
+      {active && <span aria-hidden className="absolute -left-2 top-1.5 h-5 w-[3px] rounded-r bg-primary" />}
       {icon}
       <span className="truncate">{children}</span>
-      {count !== undefined && <span className="ml-auto text-xs tabular-nums text-muted-foreground">{count}</span>}
+      {count !== undefined && count > 0 && (
+        <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">{count}</span>
+      )}
     </button>
   );
 }
 
-export function Sidebar({ view, labelId, labels, noteCount, isDark, onView, onLabel, onToggleTheme }: Props) {
+function Group({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <aside className="flex w-60 shrink-0 flex-col gap-1 border-r bg-[var(--sidebar)] p-3">
-      <div className="mb-3 flex items-center gap-2.5 px-2 pt-1">
-        <Bear className="size-9" />
-        <span className="brand-gradient bg-clip-text text-xl font-extrabold tracking-tight text-transparent">Loaf</span>
+    <nav aria-label={title} className="space-y-0.5">
+      {title && <p className="mb-1 mt-4 px-2.5 text-[11px] font-medium text-muted-foreground/80">{title}</p>}
+      {children}
+    </nav>
+  );
+}
+
+export function Sidebar({ page, labelId, labels, counts, onPage, onLabel }: Props) {
+  const go = (p: Page) => () => {
+    onLabel(null);
+    onPage(p);
+  };
+  return (
+    <aside className="flex w-56 shrink-0 flex-col border-r bg-[var(--sidebar)] px-3 pb-3 pt-3.5">
+      <div className="mb-3 flex items-center gap-2.5 px-1.5">
+        <span className="grid size-7 place-items-center overflow-hidden rounded-md bg-primary/12 ring-1 ring-primary/25">
+          <Bear className="mt-1 size-7" />
+        </span>
+        <span className="text-sm font-semibold tracking-tight">Loaf</span>
+        <span className="ml-auto rounded bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">Local</span>
       </div>
-      <nav aria-label="Main" className="space-y-0.5">
-        <Item active={view === "notes" && labelId === null} onClick={() => { onView("notes"); onLabel(null); }} icon={<NotebookPen />} count={noteCount}>Notes</Item>
-        <Item active={view === "archive"} onClick={() => { onView("archive"); onLabel(null); }} icon={<Archive />}>Archive</Item>
-      </nav>
+
+      <Group>
+        <Item active={page === "today"} onClick={go("today")} icon={<CalendarCheck2 />} count={counts.today}>Today</Item>
+        <Item active={page === "time"} onClick={go("time")} icon={<Clock3 />}>Time</Item>
+        <Item active={page === "notes" && labelId === null} onClick={go("notes")} icon={<NotebookPen />} count={counts.notes}>Notes</Item>
+        <Item active={page === "character"} onClick={go("character")} icon={<PawPrint />}>Character</Item>
+        <Item active={page === "mcp"} onClick={go("mcp")} icon={<Plug />}>MCP</Item>
+      </Group>
+
+      <Group title="Library">
+        <Item active={page === "archive"} onClick={go("archive")} icon={<Archive />}>Archive</Item>
+        <Item active={page === "bin"} onClick={go("bin")} icon={<Trash2 />} count={counts.bin}>Bin</Item>
+      </Group>
+
       {labels.length > 0 && (
-        <nav aria-label="Labels" className="mt-4 space-y-0.5">
-          <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Labels</p>
+        <Group title="Labels">
           {labels.map(({ label, count }) => (
-            <Item key={label.id} active={view === "notes" && labelId === label.id} onClick={() => { onView("notes"); onLabel(label.id); }} icon={<Tag />} count={count}>
+            <Item
+              key={label.id}
+              active={page === "notes" && labelId === label.id}
+              onClick={() => {
+                onPage("notes");
+                onLabel(label.id);
+              }}
+              icon={<Tag />}
+              count={count}
+            >
               {label.name}
             </Item>
           ))}
-        </nav>
+        </Group>
       )}
-      <div className="mt-auto flex items-center justify-between rounded-xl border bg-card/70 p-2 pl-3">
-        <div className="leading-tight">
-          <p className="text-[13px] font-semibold">Loaf</p>
-          <p className="text-xs text-muted-foreground">Keeping you company</p>
-        </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" onClick={onToggleTheme} aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}>
-              {isDark ? <Sun /> : <Moon />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{isDark ? "Light theme" : "Dark theme"}</TooltipContent>
-        </Tooltip>
+
+      <div className="mt-auto space-y-0.5 border-t pt-3">
+        <Item active={page === "settings"} onClick={go("settings")} icon={<Settings />}>Settings</Item>
+        <p className="px-2.5 pt-2 text-[11px] leading-4 text-muted-foreground/80">Everything stays on this computer.</p>
       </div>
     </aside>
   );

@@ -1,6 +1,6 @@
 // In-memory stand-in for the Rust shell, used only by `vite dev` outside Tauri.
 import type {
-  AppError, Label, LoafEvent, Note, NoteColor, NoteSummary, Task, TaskRow, TaskStatus,
+  AppError, BinNote, Reminder, Label, LoafEvent, Note, NoteColor, NoteSummary, Task, TaskRow, TaskStatus,
 } from "./types";
 
 type Args = Record<string, unknown> | undefined;
@@ -39,6 +39,15 @@ export function createMock() {
     n("n8", "Release checklist", "☐ changelog\n☐ sign installer\n☐ smoke test on Windows\n☐ smoke test on macOS", "red", 96, L("l1", "l3")),
     n("n9", "Poem for the bear", "Round as a loaf and warm as toast,\nthe quiet one who guards your most\nimportant thoughts.", "default", 120, [], false),
   ];
+  const bin: BinNote[] = [
+    { ...summary(n("b1", "Old grocery list", "Milk, eggs, bread", "default", 30, [])), deleted_at: now() - 26 * HOUR },
+    { ...summary(n("b2", "Draft: release notes", "v0.1 — first public build", "blue", 80, L("l1"))), deleted_at: now() - 3 * 24 * HOUR },
+  ];
+  const reminders: Reminder[] = [
+    { id: "r1", title: "Stand-up", remind_at: now() + 1.5 * HOUR, note_id: null, fired_at: null, done_at: null, created_at: now() },
+    { id: "r2", title: "Call the dentist", remind_at: now() + 20 * HOUR, note_id: null, fired_at: null, done_at: null, created_at: now() },
+    { id: "r3", title: "Send invoice", remind_at: now() + 3 * 24 * HOUR, note_id: null, fired_at: null, done_at: null, created_at: now() },
+  ];
   const today = new Date().toISOString().slice(0, 10);
   const tasks: Task[] = [
     t("t1", "Design the notes screen", "HIGH", today, null, "IN_PROGRESS"),
@@ -50,10 +59,10 @@ export function createMock() {
     return { id, title, description: "", status, priority, project: null, planned_date: planned, due_date: due, created_at: now(), updated_at: now(), completed_at: status === "COMPLETED" ? now() : null };
   }
 
-  const summary = (x: Note): NoteSummary => {
+  function summary(x: Note): NoteSummary {
     const { body, ...rest } = x;
     return { ...rest, excerpt: body.slice(0, 200) };
-  };
+  }
   const find = (id: unknown) => notes.find((x) => x.id === id) ?? fail("NOT_FOUND", "That note no longer exists.");
 
   const settings: Record<string, unknown> = {
@@ -95,13 +104,50 @@ export function createMock() {
     },
     note_set_pinned: (a) => { const x = find(a.id); x.pinned = a.pinned as boolean; emit("NotePinnedChanged"); return x; },
     note_set_archived: (a) => { const x = find(a.id); x.archived = a.archived as boolean; emit("NoteArchivedChanged"); return x; },
-    note_delete: (a) => { const x = find(a.id); notes.splice(notes.indexOf(x), 1); emit("NoteDeleted"); return x; },
-    note_restore: (a) => { notes.unshift(a.note as Note); emit("NoteCreated"); return a.note; },
+    note_delete: (a) => {
+      const x = find(a.id); notes.splice(notes.indexOf(x), 1);
+      bin.unshift({ ...summary(x), deleted_at: now() }); emit("NoteDeleted"); return x;
+    },
+    note_restore: (a) => {
+      const i = bin.findIndex((b) => b.id === a.id);
+      if (i < 0) fail("NOT_FOUND", "That note is no longer in the Bin.");
+      const [b] = bin.splice(i, 1);
+      const x: Note = { ...(b as BinNote), body: (b as BinNote).excerpt, archived: false };
+      notes.unshift(x); emit("NoteRestored"); return x;
+    },
     note_discard_if_empty: (a) => {
       const x = find(a.id);
       if (x.title || x.body) return false;
       notes.splice(notes.indexOf(x), 1); emit("NoteDeleted"); return true;
     },
+    notes_search: (a) => {
+      const q = String(a.query).trim().toLowerCase();
+      if (!q) return [];
+      return notes
+        .filter((x) => x.archived === a.archived && (x.title + " " + x.body).toLowerCase().includes(q))
+        .sort((p, r) => r.edited_at - p.edited_at).map(summary);
+    },
+    bin_list: () => bin,
+    note_purge: (a) => { const i = bin.findIndex((b) => b.id === a.id); if (i >= 0) bin.splice(i, 1); emit("NotePurged"); return null; },
+    bin_empty: () => { const c = bin.length; bin.length = 0; emit("NotePurged"); return c; },
+
+    reminders_list: (a) =>
+      reminders.filter((r) => a.includeDone || !r.done_at).sort((p, q) => Number(!!p.done_at) - Number(!!q.done_at) || p.remind_at - q.remind_at),
+    reminder_create: (a) => {
+      const i = a.input as { title: string; remind_at: number };
+      if (!i.title.trim()) fail("VALIDATION", "A reminder needs a title.");
+      const r: Reminder = { id: `r${++seq}`, title: i.title.trim(), remind_at: i.remind_at, note_id: null, fired_at: null, done_at: null, created_at: now() };
+      reminders.push(r); emit("ReminderCreated"); return r;
+    },
+    reminder_update: (a) => {
+      const r = reminders.find((x) => x.id === a.id) ?? fail("NOT_FOUND", "That reminder no longer exists.");
+      Object.assign(r, a.patch); emit("ReminderUpdated"); return r;
+    },
+    reminder_set_done: (a) => {
+      const r = reminders.find((x) => x.id === a.id) ?? fail("NOT_FOUND", "That reminder no longer exists.");
+      r.done_at = a.done ? now() : null; emit("ReminderUpdated"); return r;
+    },
+    reminder_delete: (a) => { const i = reminders.findIndex((x) => x.id === a.id); if (i >= 0) reminders.splice(i, 1); emit("ReminderDeleted"); return null; },
 
     labels_list: () => labels.map((label) => ({ label, count: notes.filter((x) => !x.archived && x.labels.some((l) => l.id === label.id)).length })),
     label_create: (a) => {
