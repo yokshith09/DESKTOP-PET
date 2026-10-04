@@ -10,7 +10,7 @@ export const ipc = {
   },
 
   async settingSet<K extends SettingsKey>(key: K, value: Settings[K]): Promise<void> {
-    return invoke<void>("setting_set", { key, value });
+    await invoke("setting_set", { key, value });
   },
 
   async prefsGet<T = unknown>(key: string): Promise<T | null> {
@@ -19,6 +19,6 @@ export const ipc = {
   },
 
   async prefsSet<T>(key: string, value: T): Promise<void> {
-    return invoke<void>("prefs_set", { key, value });
+    await invoke("prefs_set", { key, value });
   },
 };
