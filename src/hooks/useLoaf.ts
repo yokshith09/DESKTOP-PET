@@ -62,6 +62,7 @@ export const useReminders = (includeDone = false) =>
   useQuery({ queryKey: [...keys.reminders, includeDone], queryFn: () => ipc.remindersList(includeDone) });
 export const useLabels = () => useQuery({ queryKey: keys.labels, queryFn: ipc.labelsList });
 export const useTodayTasks = () => useQuery({ queryKey: keys.tasks, queryFn: () => ipc.tasksQuery("today") });
+export const useAllTasks = () => useQuery({ queryKey: ["tasks", "all"], queryFn: () => ipc.tasksQuery("all") });
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: ipc.settingsGetAll });
 
 function useAction<A extends unknown[], R>(fn: (...a: A) => Promise<R>, invalidate: readonly (readonly string[])[]) {

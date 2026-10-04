@@ -30,13 +30,13 @@ function Items({ notes, layout, ...h }: { notes: NoteSummary[]; layout: NotesLay
 }
 
 /** Pinned notes: larger, accent-edged cards in one row, deliberately unlike the regular grid. */
-export function PinnedRow({ notes, ...h }: { notes: NoteSummary[] } & NoteHandlers) {
+export function PinnedRow({ notes, className, ...h }: { notes: NoteSummary[]; className?: string } & NoteHandlers) {
   return (
     <section aria-label="Pinned">
       <h2 className="mb-2.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         <Pin className="size-3 rotate-45 fill-primary text-primary" />Pinned<span className="tabular-nums text-muted-foreground/70">{notes.length}</span>
       </h2>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className={`grid gap-3 ${className ?? "sm:grid-cols-2 xl:grid-cols-3"}`}>
         {notes.map((n) => <PinnedCard key={n.id} note={n} {...h} />)}
       </div>
     </section>

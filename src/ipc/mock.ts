@@ -1,4 +1,5 @@
 // In-memory stand-in for the Rust shell, used only by `vite dev` outside Tauri.
+import { daysAgo, ymd } from "../lib/dates";
 import type {
   AppError, BinNote, DailyLog, LogEntry, Reminder, Label, LoafEvent, Note, NoteColor, NoteSummary, Task, TaskRow, TaskStatus,
 } from "./types";
@@ -49,12 +50,19 @@ export function createMock() {
     { id: "r2", title: "Call the dentist", remind_at: now() + 20 * HOUR, note_id: null, fired_at: null, done_at: null, created_at: now() },
     { id: "r3", title: "Send invoice", remind_at: now() + 3 * 24 * HOUR, note_id: null, fired_at: null, done_at: null, created_at: now() },
   ];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ymd(new Date());
+  const inDays = (n: number) => ymd(daysAgo(-n));
   const tasks: Task[] = [
     t("t1", "Design the notes screen", "HIGH", today, null, "IN_PROGRESS"),
     t("t2", "Finish the sync spec", "MEDIUM", null, "2000-01-01", "PLANNED"),
     t("t3", "Refactor the tray menu", "LOW", today, null, "PLANNED"),
     t("t4", "Reply to Sam", null, today, null, "COMPLETED"),
+    t("t9", "Plan the sprint", "MEDIUM", inDays(-2), null, "COMPLETED"),
+    t("t10", "Review pull requests", "LOW", inDays(-1), null, "COMPLETED"),
+    t("t5", "Send research notes to Mara", "HIGH", inDays(1), inDays(1), "PLANNED"),
+    t("t6", "Prepare weekly planning", "MEDIUM", inDays(2), null, "PLANNED"),
+    t("t7", "Write release notes", "LOW", inDays(3), inDays(4), "PLANNED"),
+    t("t8", "Clear design feedback", "LOW", inDays(4), null, "PLANNED"),
   ];
   function t(id: string, title: string, priority: Task["priority"], planned: string | null, due: string | null, status: TaskStatus): Task {
     return { id, title, description: "", status, priority, project: null, planned_date: planned, due_date: due, note_id: null, source_action_item_id: null, created_at: now(), updated_at: now(), started_at: null, completed_at: status === "COMPLETED" ? now() : null, cancelled_at: null };
@@ -202,7 +210,11 @@ export function createMock() {
     label_rename: () => fail("INTERNAL", "Not in the mock."),
     label_delete: () => fail("INTERNAL", "Not in the mock."),
 
-    tasks_query: () => tasks.filter((x) => x.status !== "CANCELLED" && x.status !== "COMPLETED").map<TaskRow>((task) => ({ task, overdue: !!task.due_date && task.due_date < today && task.status !== "COMPLETED" })),
+    tasks_query: (a) => {
+      const open = (x: Task) => x.status !== "CANCELLED" && x.status !== "COMPLETED";
+      const rows = a.view === "all" ? tasks : tasks.filter((x) => open(x) && (x.status === "IN_PROGRESS" || x.planned_date === today || (!!x.due_date && x.due_date < today)));
+      return rows.map<TaskRow>((task) => ({ task, overdue: !!task.due_date && task.due_date < today && open(task) }));
+    },
     task_quick_add: (a) => { const x = t(`t${++seq}`, String(a.title), null, today, null, "PLANNED"); tasks.push(x); emit("TaskCreated"); return x; },
     daily_log_get: (a) => {
       const d = new Date(String(a.date) + "T00:00:00");

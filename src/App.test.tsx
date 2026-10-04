@@ -22,20 +22,25 @@ async function goTo(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
 const openNotes = (user: ReturnType<typeof userEvent.setup>) => goTo(user, /^Notes/);
 
 describe("Notes screen (against the in-memory shell)", () => {
-  it("opens on the Overview with Today first", async () => {
+  it("opens on Today overview, with Activity, and without search or New note", async () => {
     render(<App />);
-    expect(await screen.findByRole("heading", { name: "Overview" })).toBeTruthy();
-    expect(await screen.findByRole("region", { name: "Today" })).toBeTruthy();
-    expect(within(await screen.findByRole("region", { name: "Pinned" })).getByRole("button", { name: "Loaf v1 scope" })).toBeTruthy();
+    expect(await screen.findByRole("region", { name: "Today’s agenda" })).toBeTruthy();
+    expect(await screen.findByRole("region", { name: "Activity" })).toBeTruthy();
+    expect(within(await screen.findByRole("region", { name: "Pinned notes" })).getByRole("button", { name: "Loaf v1 scope" })).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "Search notes" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /New note/ })).toBeNull();
   });
 
-  it("Notes shows Today first, then Pinned apart from the rest", async () => {
+  it("Notes has search and New note, shows Today first, then the week, Pinned, and the rest", async () => {
     const user = userEvent.setup();
     render(<App />);
     await openNotes(user);
+    expect(await screen.findByRole("textbox", { name: "Search notes" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /New note/ })).toBeTruthy();
     const regions = (await screen.findAllByRole("region")).map((r) => r.getAttribute("aria-label"));
-    expect(regions.indexOf("Today")).toBeLessThan(regions.indexOf("Pinned"));
-    expect(regions.indexOf("Pinned")).toBeLessThan(regions.indexOf("All notes"));
+    const order = ["Today", "This week", "Pinned", "All notes"].map((n) => regions.indexOf(n));
+    expect(order.every((n) => n >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(within(screen.getByRole("region", { name: "All notes" })).getByRole("button", { name: "Groceries" })).toBeTruthy();
   });
 

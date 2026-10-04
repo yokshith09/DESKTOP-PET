@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Plug } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
@@ -15,22 +15,17 @@ import type { NotesLayout } from "@/features/notes/NotesBoard";
 import { SettingsPage } from "@/features/settings/SettingsPage";
 import { ComingSoon } from "@/features/shell/ComingSoon";
 import { Sidebar, type Page } from "@/features/shell/Sidebar";
-import { TopBar } from "@/features/shell/TopBar";
-import { TodayPage } from "@/features/tasks/TodayPage";
 import { TimePage } from "@/features/time/TimePage";
-import { OverviewPage } from "@/features/overview/OverviewPage";
+import { TodayOverviewPage } from "@/features/overview/TodayOverviewPage";
 
-const PAGES: readonly Page[] = ["overview", "today", "time", "notes", "archive", "bin", "character", "mcp", "settings"];
+const PAGES: readonly Page[] = ["today", "time", "notes", "archive", "bin", "character", "mcp", "settings"];
 
 function Screen() {
-  const [page, setPageState] = useState<Page>("overview");
+  const [page, setPageState] = useState<Page>("today");
   const [labelId, setLabelId] = useState<string | null>(null);
   const [sort, setSort] = useState<NoteSort>("last_edited");
   const [layout, setLayoutState] = useState<NotesLayout>("grid");
   const [editing, setEditing] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const searchRef = useRef<HTMLInputElement>(null);
 
   useBusSync();
   const theme = useTheme();
@@ -54,38 +49,11 @@ function Screen() {
     void ipc.prefsSet("ui.notes_layout", l);
   };
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(query), 150);
-    return () => clearTimeout(t);
-  }, [query]);
-
   const newNote = async () => {
     const note = await actions.create({ label_ids: labelId ? [labelId] : [] });
     if (page !== "notes") setPage("notes");
     setEditing(note.id);
   };
-  const onQuery = (q: string) => {
-    setQuery(q);
-    if (q.trim() && page !== "notes" && page !== "archive") setPage("notes");
-  };
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.shiftKey) return;
-      const k = e.key.toLowerCase();
-      if (k === "n") {
-        e.preventDefault();
-        void newNote();
-      } else if (k === "k") {
-        e.preventDefault();
-        searchRef.current?.focus();
-        searchRef.current?.select();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-
   const labelName = labelId ? labels.find((l) => l.label.id === labelId)?.label.name : undefined;
 
   return (
@@ -93,26 +61,24 @@ function Screen() {
       <Sidebar
         page={page} labelId={labelId} labels={labels}
         counts={{ today: agenda.open, notes: allNotes.length, bin: bin.length }}
-        onPage={setPage} onLabel={setLabelId}
+        onPage={setPage} onLabel={setLabelId} isDark={theme.isDark} onToggleTheme={() => void theme.toggle()}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar ref={searchRef} query={query} onQuery={onQuery} isDark={theme.isDark} onToggleTheme={() => void theme.toggle()} onNewNote={() => void newNote()} />
         <main className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1280px] px-6 py-6">
             {(page === "notes" || page === "archive") && (
               <NotesPage
                 archived={page === "archive"} labelId={page === "notes" ? labelId : null} {...(labelName ? { labelName } : {})}
-                query={debounced} sort={sort} layout={layout} onSort={setSort} onLayout={setLayout}
+                sort={sort} layout={layout} onSort={setSort} onLayout={setLayout}
                 onOpen={setEditing} onNew={() => void newNote()} onNavigate={setPage}
               />
             )}
-            {page === "overview" && (
-              <OverviewPage
+            {page === "today" && (
+              <TodayOverviewPage
                 onNavigate={setPage} onOpen={setEditing} onPin={(id, p) => void actions.pin(id, p)}
                 onArchive={(id, a) => void actions.archive(id, a)} onDelete={(id) => void actions.remove(id)}
               />
             )}
-            {page === "today" && <TodayPage />}
             {page === "bin" && <BinPage />}
             {page === "character" && <CharacterPage />}
             {page === "settings" && <SettingsPage />}

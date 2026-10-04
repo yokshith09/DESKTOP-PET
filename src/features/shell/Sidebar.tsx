@@ -1,11 +1,11 @@
 import {
-  Archive, CalendarCheck2, Clock3, LayoutDashboard, NotebookPen, PawPrint, Plug, Settings, Tag, Trash2,
+  Archive, Clock3, LayoutDashboard, Moon, NotebookPen, PawPrint, Plug, Settings, Sun, Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LabelCount } from "@/ipc";
 import { Bear } from "./Bear";
 
-export type Page = "overview" | "today" | "time" | "notes" | "archive" | "bin" | "character" | "mcp" | "settings";
+export type Page = "today" | "time" | "notes" | "archive" | "bin" | "character" | "mcp" | "settings";
 
 interface Props {
   page: Page;
@@ -14,6 +14,8 @@ interface Props {
   counts: { today: number; notes: number; bin: number };
   onPage: (p: Page) => void;
   onLabel: (id: string | null) => void;
+  isDark: boolean;
+  onToggleTheme: () => void;
 }
 
 function Item({
@@ -48,7 +50,10 @@ function Group({ title, children }: { title?: string; children: React.ReactNode 
   );
 }
 
-export function Sidebar({ page, labelId, labels, counts, onPage, onLabel }: Props) {
+const DOTS = ["bg-sky-400", "bg-emerald-400", "bg-amber-400", "bg-fuchsia-400", "bg-rose-400", "bg-teal-400", "bg-violet-400"];
+const dotFor = (name: string) => DOTS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % DOTS.length] ?? "bg-sky-400";
+
+export function Sidebar({ page, labelId, labels, counts, onPage, onLabel, isDark, onToggleTheme }: Props) {
   const go = (p: Page) => () => {
     onLabel(null);
     onPage(p);
@@ -64,8 +69,7 @@ export function Sidebar({ page, labelId, labels, counts, onPage, onLabel }: Prop
       </div>
 
       <Group>
-        <Item active={page === "overview"} onClick={go("overview")} icon={<LayoutDashboard />}>Overview</Item>
-        <Item active={page === "today"} onClick={go("today")} icon={<CalendarCheck2 />} count={counts.today}>Today</Item>
+        <Item active={page === "today"} onClick={go("today")} icon={<LayoutDashboard />} count={counts.today}>Today overview</Item>
         <Item active={page === "time"} onClick={go("time")} icon={<Clock3 />}>Time</Item>
         <Item active={page === "notes" && labelId === null} onClick={go("notes")} icon={<NotebookPen />} count={counts.notes}>Notes</Item>
         <Item active={page === "character"} onClick={go("character")} icon={<PawPrint />}>Character</Item>
@@ -87,7 +91,7 @@ export function Sidebar({ page, labelId, labels, counts, onPage, onLabel }: Prop
                 onPage("notes");
                 onLabel(label.id);
               }}
-              icon={<Tag />}
+              icon={<span aria-hidden className={cn("size-2 rounded-full", dotFor(label.name))} />}
               count={count}
             >
               {label.name}
@@ -97,7 +101,15 @@ export function Sidebar({ page, labelId, labels, counts, onPage, onLabel }: Prop
       )}
 
       <div className="mt-auto space-y-0.5 border-t pt-3">
-        <Item active={page === "settings"} onClick={go("settings")} icon={<Settings />}>Settings</Item>
+        <div className="flex items-center gap-1">
+          <div className="min-w-0 flex-1"><Item active={page === "settings"} onClick={go("settings")} icon={<Settings />}>Settings</Item></div>
+          <button
+            type="button" onClick={onToggleTheme} aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"} title={isDark ? "Light theme" : "Dark theme"}
+            className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground outline-none hover:bg-accent/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-4"
+          >
+            {isDark ? <Sun /> : <Moon />}
+          </button>
+        </div>
         <p className="px-2.5 pt-2 text-[11px] leading-4 text-muted-foreground/80">Everything stays on this computer.</p>
       </div>
     </aside>
