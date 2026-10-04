@@ -26,7 +26,7 @@ describe("Notes screen (against the in-memory shell)", () => {
     render(<App />);
     expect(await screen.findByRole("region", { name: "Today’s agenda" })).toBeTruthy();
     expect(await screen.findByRole("region", { name: "Activity" })).toBeTruthy();
-    expect(within(await screen.findByRole("region", { name: "Pinned notes" })).getByRole("button", { name: "Loaf v1 scope" })).toBeTruthy();
+    expect(await within(await screen.findByRole("region", { name: "Pinned notes" })).findByRole("button", { name: "Loaf v1 scope" })).toBeTruthy();
     expect(screen.queryByRole("textbox", { name: "Search notes" })).toBeNull();
     expect(screen.queryByRole("button", { name: /New note/ })).toBeNull();
   });
