@@ -14,5 +14,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "=2.7.1", features = [] }
 
 [dependencies]
-tauri = { version = "=2.12.1", features = [] }
+tauri = { version = "=2.12.1", features = ["tray-icon"] }
 loaf-core = { path = "../crates/loaf-core" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
