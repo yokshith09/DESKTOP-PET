@@ -3,7 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Clock3, Plug } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useBin, useBusSync, useLabels, useNoteActions, useNotes, useTodayTasks } from "@/hooks/useLoaf";
+import { useBin, useBusSync, useLabels, useNoteActions, useNotes } from "@/hooks/useLoaf";
+import { useAgenda } from "@/features/overview/TodayAgenda";
 import { useTheme } from "@/hooks/useTheme";
 import { ipc, type NoteSort } from "@/ipc";
 import { BinPage } from "@/features/bin/BinPage";
@@ -34,7 +35,7 @@ function Screen() {
   const actions = useNoteActions();
   const { data: allNotes = [] } = useNotes(false, null, "last_edited");
   const { data: labels = [] } = useLabels();
-  const { data: tasks = [] } = useTodayTasks();
+  const agenda = useAgenda();
   const { data: bin = [] } = useBin();
 
   // Restore where the person left off (ui.last_view, ui.notes_layout).
@@ -89,7 +90,7 @@ function Screen() {
     <div className="flex h-screen min-h-[600px] bg-background text-foreground">
       <Sidebar
         page={page} labelId={labelId} labels={labels}
-        counts={{ today: tasks.length, notes: allNotes.length, bin: bin.length }}
+        counts={{ today: agenda.open, notes: allNotes.length, bin: bin.length }}
         onPage={setPage} onLabel={setLabelId}
       />
       <div className="flex min-w-0 flex-1 flex-col">

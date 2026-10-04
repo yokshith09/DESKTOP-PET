@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { BellPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -34,9 +34,9 @@ export function AddReminder() {
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setWhen(toLocalInput(Date.now() + 3_600_000)); }}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm"><Plus />Add</Button>
+        <Button type="button" variant="secondary" size="icon" aria-label="Add reminder" title="Add reminder"><BellPlus /></Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72">
+      <PopoverContent align="end" side="top" className="w-72">
         <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
           <div className="space-y-1.5">
             <label htmlFor="rem-title" className="text-xs font-medium text-muted-foreground">Remind me to</label>

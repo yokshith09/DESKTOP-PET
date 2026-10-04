@@ -1,24 +1,16 @@
-import { CalendarCheck2 } from "lucide-react";
-import { Panel, PageHeader } from "@/features/shell/PageHeader";
-import { QuickAddTask, TaskRows } from "@/features/overview/Overview";
-import { useTodayTasks } from "@/hooks/useLoaf";
-import { Empty } from "@/features/notes/NotesBoard";
+import { Tile, PageHeader } from "@/features/shell/PageHeader";
+import { TodayAgenda, TodayComposer, useAgenda } from "@/features/overview/TodayAgenda";
 
 export function TodayPage() {
-  const { data = [] } = useTodayTasks();
-  const overdue = data.filter((r) => r.overdue).length;
+  const a = useAgenda();
   const date = new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  const flagged = a.overdue + a.missed;
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Today" description={`${date} · ${data.length} open${overdue ? ` · ${overdue} overdue` : ""}`} />
-      <Panel className="p-4">
-        {data.length === 0 ? (
-          <Empty icon={<CalendarCheck2 />} title="Nothing planned yet" hint="Add the first thing you want to finish today." />
-        ) : (
-          <TaskRows />
-        )}
-        <div className="mt-3"><QuickAddTask /></div>
-      </Panel>
+      <PageHeader title="Today" description={`${date} · ${a.open} open${flagged ? ` · ${flagged} overdue or missed` : ""}`} />
+      <Tile title="Agenda" count={a.open} footer={<TodayComposer />} bodyClassName="min-h-64">
+        <TodayAgenda showUpcoming />
+      </Tile>
     </div>
   );
 }

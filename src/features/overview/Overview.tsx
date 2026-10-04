@@ -1,73 +1,12 @@
-import { useState } from "react";
-import { ArrowRight, Bell, CalendarCheck2, NotebookPen, Plus, Trash2, TriangleAlert } from "lucide-react";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { ArrowRight, Bell, CalendarCheck2, NotebookPen, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tile } from "@/features/shell/PageHeader";
-import { AddReminder } from "@/features/reminders/AddReminder";
-import { RemindersList } from "@/features/reminders/RemindersList";
-import { BinList, EmptyBinButton } from "@/features/bin/BinList";
-import { useBin, useReminders, useTaskActions, useTodayTasks } from "@/hooks/useLoaf";
-import { cn } from "@/lib/utils";
-import type { NoteSummary, Priority } from "@/ipc";
 import type { Page } from "@/features/shell/Sidebar";
+import { useBin } from "@/hooks/useLoaf";
 import { formatWhen } from "@/lib/time";
-
-export const PRIORITY: Record<Priority, { glyph: string; label: string; cls: string }> = {
-  HIGH: { glyph: "▲", label: "High", cls: "text-primary" },
-  MEDIUM: { glyph: "■", label: "Medium", cls: "text-muted-foreground" },
-  LOW: { glyph: "▼", label: "Low", cls: "text-muted-foreground" },
-};
-
-export function TaskRows({ limit }: { limit?: number }) {
-  const { data = [] } = useTodayTasks();
-  const { setDone } = useTaskActions();
-  const rows = limit ? data.slice(0, limit) : data;
-  const complete = async (id: string, title: string) => {
-    await setDone(id, true);
-    toast(`Completed “${title}”`, { action: { label: "Undo", onClick: () => void setDone(id, false) } });
-  };
-  if (rows.length === 0) {
-    return <p className="px-1 py-8 text-center text-[13px] text-muted-foreground">Nothing planned yet. Add the first thing you want to finish today.</p>;
-  }
-  return (
-    <ul className="-mx-1.5">
-      {rows.map(({ task, overdue }) => (
-        <li key={task.id} className="flex h-9 items-center gap-2.5 rounded-md px-1.5 hover:bg-accent/50">
-          <Checkbox aria-label={`Complete ${task.title}`} checked={false} onCheckedChange={() => void complete(task.id, task.title)} />
-          <span className="min-w-0 flex-1 truncate text-[13px]">{task.title}</span>
-          {task.status === "IN_PROGRESS" && <Badge variant="primary">In progress</Badge>}
-          {overdue && <Badge variant="destructive">Overdue</Badge>}
-          {task.priority && (
-            <span className={cn("w-14 text-right text-[11px]", PRIORITY[task.priority].cls)} title={`${PRIORITY[task.priority].label} priority`}>
-              <span aria-hidden>{PRIORITY[task.priority].glyph}</span> {PRIORITY[task.priority].label}
-            </span>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-export function QuickAddTask() {
-  const { quickAdd } = useTaskActions();
-  const [draft, setDraft] = useState("");
-  const add = async () => {
-    const title = draft.trim();
-    if (!title) return;
-    setDraft("");
-    await quickAdd(title);
-  };
-  return (
-    <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void add(); }}>
-      <Input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a task for today" aria-label="New task" maxLength={200} />
-      <Button type="submit" variant="secondary" size="icon" aria-label="Add task" disabled={!draft.trim()}><Plus /></Button>
-    </form>
-  );
-}
+import { cn } from "@/lib/utils";
+import type { NoteSummary } from "@/ipc";
+import { TodayAgenda, TodayComposer, useAgenda } from "./TodayAgenda";
 
 function Stat({
   label, value, sub, icon, tone, onClick,
@@ -123,54 +62,34 @@ function ActivityTile({ notes }: { notes: NoteSummary[] }) {
 }
 
 export function Overview({ notes, onNavigate }: { notes: NoteSummary[]; onNavigate: (p: Page) => void }) {
-  const { data: tasks = [] } = useTodayTasks();
-  const { data: reminders = [] } = useReminders(false);
+  const agenda = useAgenda();
   const { data: bin = [] } = useBin();
-  const overdue = tasks.filter((t) => t.overdue).length;
-  const next = reminders[0];
+  const flagged = agenda.overdue + agenda.missed;
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Stat label="Notes" value={notes.length} sub={`${notes.filter((n) => n.pinned).length} pinned`} icon={<NotebookPen />} />
         <Stat
-          label="Open today" value={tasks.length} icon={<CalendarCheck2 />} onClick={() => onNavigate("today")}
-          sub={overdue ? `${overdue} overdue` : "All on track"} {...(overdue ? { tone: "warn" as const } : {})}
+          label="Open today" value={agenda.open} icon={<CalendarCheck2 />} onClick={() => onNavigate("today")}
+          sub={flagged ? `${flagged} overdue or missed` : "All on track"} {...(flagged ? { tone: "warn" as const } : {})}
         />
-        <Stat label="Reminders" value={reminders.length} icon={<Bell />} sub={next ? `Next: ${formatWhen(next.remind_at)}` : "Nothing scheduled"} />
-        <Stat label="In Bin" value={bin.length} icon={<Trash2 />} sub="Cleared after 30 days" onClick={() => onNavigate("bin")} />
+        <Stat
+          label="Next up" icon={<Bell />} onClick={() => onNavigate("today")}
+          value={agenda.next ? new Date(agenda.next.remind_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}
+          sub={agenda.next ? `${agenda.next.title} · ${formatWhen(agenda.next.remind_at).split(" ")[0] ?? ""}` : "No reminders scheduled"}
+        />
+        <Stat label="In Bin" value={bin.length} sub="Cleared after 30 days" icon={<Trash2 />} onClick={() => onNavigate("bin")} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-80">
         <Tile
-          className="lg:col-span-5" title="Today" count={tasks.length}
+          className="lg:col-span-8" title="Today" count={agenda.open}
           action={<Button variant="ghost" size="sm" onClick={() => onNavigate("today")}>View all<ArrowRight /></Button>}
-          footer={<QuickAddTask />}
+          footer={<TodayComposer />}
         >
-          <TaskRows limit={6} />
+          <TodayAgenda />
         </Tile>
-
-        <Tabs defaultValue="reminders" className="contents">
-          <Tile
-            className="lg:col-span-4"
-            tabs={
-              <TabsList>
-                <TabsTrigger value="reminders">Reminders</TabsTrigger>
-                <TabsTrigger value="bin">Bin</TabsTrigger>
-              </TabsList>
-            }
-            action={
-              <>
-                <TabsContent value="reminders"><AddReminder /></TabsContent>
-                <TabsContent value="bin"><EmptyBinButton /></TabsContent>
-              </>
-            }
-          >
-            <TabsContent value="reminders"><RemindersList limit={8} /></TabsContent>
-            <TabsContent value="bin"><BinList limit={8} /></TabsContent>
-          </Tile>
-        </Tabs>
-
-        <div className="lg:col-span-3 [&>section]:h-full"><ActivityTile notes={notes} /></div>
+        <div className="lg:col-span-4 [&>section]:h-full"><ActivityTile notes={notes} /></div>
       </div>
     </div>
   );

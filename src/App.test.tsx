@@ -53,20 +53,21 @@ describe("Notes screen (against the in-memory shell)", () => {
     expect(screen.getByRole("button", { name: "Groceries" })).toBeTruthy();
   });
 
-  it("restores a note from the Bin tab", async () => {
+  it("restores a note from the Bin page", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("tab", { name: /Bin/ }));
+    await user.click(await screen.findByRole("button", { name: /^Bin/ }));
     expect(await screen.findByText(/Old grocery list/)).toBeTruthy();
     await user.click(screen.getByRole("button", { name: /Restore “Old grocery list”/ }));
+    await user.click(await screen.findByRole("button", { name: /^Notes/ }));
     expect(await screen.findByRole("button", { name: "Old grocery list" })).toBeTruthy();
   });
 
   it("adds a reminder", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByText("Stand-up");
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await screen.findByText("Review the sync PR");
+    await user.click(screen.getByRole("button", { name: "Add reminder" }));
     await user.type(await screen.findByLabelText("Remind me to"), "Water the plants");
     await user.click(screen.getByRole("button", { name: "Set reminder" }));
     expect(await screen.findByText("Water the plants")).toBeTruthy();

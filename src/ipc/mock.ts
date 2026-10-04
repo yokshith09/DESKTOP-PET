@@ -44,6 +44,7 @@ export function createMock() {
     { ...summary(n("b2", "Draft: release notes", "v0.1 — first public build", "blue", 80, L("l1"))), deleted_at: now() - 3 * 24 * HOUR },
   ];
   const reminders: Reminder[] = [
+    { id: "r0", title: "Review the sync PR", remind_at: now() - 40 * 60_000, note_id: null, fired_at: now() - 40 * 60_000, done_at: null, created_at: now() },
     { id: "r1", title: "Stand-up", remind_at: now() + 1.5 * HOUR, note_id: null, fired_at: null, done_at: null, created_at: now() },
     { id: "r2", title: "Call the dentist", remind_at: now() + 20 * HOUR, note_id: null, fired_at: null, done_at: null, created_at: now() },
     { id: "r3", title: "Send invoice", remind_at: now() + 3 * 24 * HOUR, note_id: null, fired_at: null, done_at: null, created_at: now() },
