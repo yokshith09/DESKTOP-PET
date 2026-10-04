@@ -16,6 +16,8 @@ export interface Settings {
   "shortcuts.global_open": string | null;
   "shortcuts.global_new_note": string | null;
   "shortcuts.global_new_task": string | null;
+  "tracking.apps": boolean;
+  "tracking.exclude_apps": string[];
   "advanced.log_level": "trace" | "debug" | "info" | "warn" | "error";
 }
 

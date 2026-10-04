@@ -28,6 +28,8 @@ export function useBusSync() {
           toast(r?.title ?? "Reminder", { description: "Reminder is due" });
         }
         if (e.type.startsWith("Reminder")) void qc.invalidateQueries({ queryKey: keys.reminders });
+        if (e.type === "UsageUpdated") void qc.invalidateQueries({ queryKey: ["usage"] });
+        if (e.type === "SettingChanged") void qc.invalidateQueries({ queryKey: ["tracking"] });
         if (e.type.startsWith("Note") || e.type === "LabelsChanged") {
           void qc.invalidateQueries({ queryKey: keys.bin });
           void qc.invalidateQueries({ queryKey: ["notes"] });
@@ -62,6 +64,10 @@ export const useReminders = (includeDone = false) =>
   useQuery({ queryKey: [...keys.reminders, includeDone], queryFn: () => ipc.remindersList(includeDone) });
 export const useLabels = () => useQuery({ queryKey: keys.labels, queryFn: ipc.labelsList });
 export const useTodayTasks = () => useQuery({ queryKey: keys.tasks, queryFn: () => ipc.tasksQuery("today") });
+export const useUpcomingTasks = () => useQuery({ queryKey: ["tasks", "upcoming"], queryFn: () => ipc.tasksQuery("upcoming") });
+export const useTrackingStatus = () => useQuery({ queryKey: ["tracking", "status"], queryFn: ipc.trackingStatus });
+export const useUsage = (from: number, to: number) =>
+  useQuery({ queryKey: ["usage", from, to], queryFn: () => ipc.usageSummary(from, to), refetchInterval: false });
 export const useAllTasks = () => useQuery({ queryKey: ["tasks", "all"], queryFn: () => ipc.tasksQuery("all") });
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: ipc.settingsGetAll });
 

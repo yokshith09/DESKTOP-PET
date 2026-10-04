@@ -35,3 +35,16 @@ export function toLocalInput(ms: number): string {
   return d.toISOString().slice(0, 16);
 }
 export const fromLocalInput = (v: string): number => new Date(v).getTime();
+
+/** 35 -> "35s", 2100 -> "35m", 35220 -> "9h 47m". */
+export function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s}s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  return rest === 0 ? `${h}h` : `${h}h ${rest}m`;
+}
+
+export const clockTime = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });

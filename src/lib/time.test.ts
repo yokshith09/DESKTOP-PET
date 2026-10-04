@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatWhen, fromLocalInput, greeting, timeAgo, toLocalInput } from "./time";
+import { formatDuration, formatWhen, fromLocalInput, greeting, timeAgo, toLocalInput } from "./time";
 
 describe("timeAgo", () => {
   const now = 1_000_000_000_000;
@@ -32,5 +32,14 @@ describe("formatWhen", () => {
   it("round-trips the datetime-local value", () => {
     const t = new Date(2026, 9, 4, 15, 30).getTime();
     expect(fromLocalInput(toLocalInput(t))).toBe(t);
+  });
+});
+
+describe("formatDuration", () => {
+  it("is short and human", () => {
+    expect(formatDuration(35)).toBe("35s");
+    expect(formatDuration(2100)).toBe("35m");
+    expect(formatDuration(3600)).toBe("1h");
+    expect(formatDuration(35220)).toBe("9h 47m");
   });
 });

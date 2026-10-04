@@ -1,7 +1,7 @@
 // Typed IPC client (F0-07): the only place that knows command names and argument shapes.
 import { call } from "./transport";
 import type {
-  BinNote, DailyLog, Reminder, ReminderInput, ReminderPatch, Label, LabelCount, Note, NoteInput, NotePatch, NoteSort, NoteSummary, Task, TaskRow,
+  UsageSummary, TimeRange, TrackingStatus, BinNote, DailyLog, Reminder, ReminderInput, ReminderPatch, Label, LabelCount, Note, NoteInput, NotePatch, NoteSort, NoteSummary, Task, TaskRow,
   TaskStatus, TaskView,
 } from "./types";
 import type { Settings, SettingsKey } from "./settings";
@@ -43,5 +43,11 @@ export const ipc = {
   tasksQuery: (view: TaskView) => call<TaskRow[]>("tasks_query", { view }),
   taskQuickAdd: (title: string) => call<Task>("task_quick_add", { title }),
   dailyLogGet: (date: string) => call<DailyLog | null>("daily_log_get", { date }),
+  usageSummary: (from: number, to: number) => call<UsageSummary>("usage_summary", { from, to }),
+  usageAppSessions: (app: string, from: number, to: number) => call<TimeRange[]>("usage_app_sessions", { app, from, to }),
+  usageDomainSessions: (domain: string, from: number, to: number) => call<TimeRange[]>("usage_domain_sessions", { domain, from, to }),
+  trackingStatus: () => call<TrackingStatus>("tracking_status"),
+  usageDelete: (from: number | null, to: number | null) => call<unknown>("usage_delete", { from, to }),
+  openUrl: (url: string) => call<unknown>("open_url", { url }),
   taskTransition: (id: string, to: TaskStatus) => call<Task>("task_transition", { id, to }),
 };

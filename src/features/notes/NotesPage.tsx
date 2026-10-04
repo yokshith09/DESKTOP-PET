@@ -10,7 +10,7 @@ import { WeekCalendar } from "@/features/calendar/WeekCalendar";
 import { PageHeader } from "@/features/shell/PageHeader";
 import type { Page } from "@/features/shell/Sidebar";
 import { useNoteActions, useNotes, useSearch } from "@/hooks/useLoaf";
-import type { NoteSort } from "@/ipc";
+import type { LabelCount, NoteSort } from "@/ipc";
 import { NotesBoard, type NotesLayout } from "./NotesBoard";
 import { TodayStrip } from "./TodayStrip";
 
@@ -22,6 +22,8 @@ interface Props {
   archived: boolean;
   labelId: string | null;
   labelName?: string;
+  labels: LabelCount[];
+  onLabel: (id: string | null) => void;
   sort: NoteSort;
   layout: NotesLayout;
   onSort: (s: NoteSort) => void;
@@ -32,7 +34,7 @@ interface Props {
 }
 
 /** Notes: search, new note and Ctrl/⌘ K / N live here and nowhere else. */
-export function NotesPage({ archived, labelId, labelName, sort, layout, onSort, onLayout, onOpen, onNew, onNavigate }: Props) {
+export function NotesPage({ archived, labelId, labelName, labels, onLabel, sort, layout, onSort, onLayout, onOpen, onNew, onNavigate }: Props) {
   const actions = useNoteActions();
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -71,9 +73,9 @@ export function NotesPage({ archived, labelId, labelName, sort, layout, onSort, 
   return (
     <div className="space-y-6">
       {mode === "notes" && (
-        <div className="space-y-4">
-          <TodayStrip onViewAll={() => onNavigate("today")} />
-          <WeekCalendar />
+        <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-72">
+          <TodayStrip className="lg:col-span-4" onViewAll={() => onNavigate("today")} />
+          <WeekCalendar className="lg:col-span-8" />
         </div>
       )}
       <div>
@@ -122,6 +124,18 @@ export function NotesPage({ archived, labelId, labelName, sort, layout, onSort, 
             </>
           }
         />
+        {!archived && !searching && labels.length > 0 && (
+          <div className="-mt-2 mb-5 flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by label">
+            {[{ id: null as string | null, name: "All notes", count: undefined as number | undefined }, ...labels.map(({ label, count }) => ({ id: label.id as string | null, name: label.name, count }))].map((l) => (
+              <button
+                key={l.id ?? "all"} type="button" aria-pressed={labelId === l.id} onClick={() => onLabel(l.id)}
+                className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${labelId === l.id ? "border-primary/50 bg-primary/10 text-foreground" : "bg-card text-muted-foreground hover:text-foreground"}`}
+              >
+                {l.name}{l.count !== undefined && <span className="tabular-nums text-muted-foreground">{l.count}</span>}
+              </button>
+            ))}
+          </div>
+        )}
         <NotesBoard
           notes={notes} layout={layout} mode={mode} onNew={onNew}
           onOpen={onOpen} onPin={(id, p) => void actions.pin(id, p)}

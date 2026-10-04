@@ -1,22 +1,23 @@
-import { ArrowRight, Bell, CalendarCheck2 } from "lucide-react";
+import { ArrowRight, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PRIORITY, useAgenda } from "@/features/overview/TodayAgenda";
+import { Tile } from "@/features/shell/PageHeader";
 import { useReminderActions, useTaskActions } from "@/hooks/useLoaf";
 import { formatWhen } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
-/** The first thing on the Notes page: what is due today, as slim checkable rows. */
-export function TodayStrip({ onViewAll }: { onViewAll: () => void }) {
+/** Today's open tasks and due reminders as slim checkable rows: the first thing on the Notes tab. */
+export function TodayStrip({ onViewAll, className }: { onViewAll: () => void; className?: string }) {
   const { tasks, reminders, open } = useAgenda();
   const { setDone } = useTaskActions();
   const reminderActions = useReminderActions();
   const rows = [
     ...reminders.map((r) => ({ kind: "reminder" as const, id: r.id, title: r.title, when: r.remind_at })),
     ...tasks.map(({ task, overdue }) => ({ kind: "task" as const, id: task.id, title: task.title, priority: task.priority, overdue, status: task.status })),
-  ].slice(0, 5);
+  ];
 
   const complete = async (id: string, title: string) => {
     await setDone(id, true);
@@ -24,19 +25,16 @@ export function TodayStrip({ onViewAll }: { onViewAll: () => void }) {
   };
 
   return (
-    <section aria-label="Today" className="rounded-xl border bg-card">
-      <header className="flex h-11 items-center gap-2 border-b px-4">
-        <CalendarCheck2 className="size-4 text-primary" />
-        <h2 className="text-[13px] font-semibold">Today</h2>
-        <span className="rounded-md bg-muted px-1.5 text-[11px] font-medium tabular-nums leading-5 text-muted-foreground">{open}</span>
-        <Button variant="ghost" size="sm" className="ml-auto" onClick={onViewAll}>Open Today<ArrowRight /></Button>
-      </header>
+    <Tile
+      className={className} title="Today" count={open}
+      action={<Button variant="ghost" size="sm" onClick={onViewAll}>Open<ArrowRight /></Button>}
+    >
       {rows.length === 0 ? (
-        <p className="px-4 py-5 text-[13px] text-muted-foreground">Nothing planned for today. Add a task from the Today page.</p>
+        <p className="px-2 py-8 text-center text-[13px] text-muted-foreground">Nothing planned for today.</p>
       ) : (
-        <ul className="grid gap-x-6 p-2 md:grid-cols-2">
+        <ul>
           {rows.map((r) => (
-            <li key={`${r.kind}-${r.id}`} className="flex h-9 items-center gap-2.5 rounded-md px-2 hover:bg-accent/50">
+            <li key={`${r.kind}-${r.id}`} className="flex h-9 items-center gap-2.5 rounded-md px-1.5 hover:bg-accent/50">
               <Checkbox
                 aria-label={`${r.kind === "task" ? "Complete" : "Done:"} ${r.title}`} checked={false}
                 onCheckedChange={() => void (r.kind === "task" ? complete(r.id, r.title) : reminderActions.setDone(r.id, true))}
@@ -49,14 +47,14 @@ export function TodayStrip({ onViewAll }: { onViewAll: () => void }) {
               ) : (
                 <>
                   {r.overdue && <Badge variant="destructive">Overdue</Badge>}
-                  {r.status === "IN_PROGRESS" && <Badge variant="primary">In progress</Badge>}
-                  {r.priority && <span className={cn("text-[11px]", PRIORITY[r.priority].cls)} aria-label={`${PRIORITY[r.priority].label} priority`}>{PRIORITY[r.priority].glyph}</span>}
+                  {r.status === "IN_PROGRESS" && <Badge variant="primary">Doing</Badge>}
+                  {r.priority && <span className={cn("w-3 text-center text-[11px]", PRIORITY[r.priority].cls)} aria-label={`${PRIORITY[r.priority].label} priority`}>{PRIORITY[r.priority].glyph}</span>}
                 </>
               )}
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </Tile>
   );
 }

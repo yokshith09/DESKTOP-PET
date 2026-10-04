@@ -59,9 +59,9 @@ function Screen() {
   return (
     <div className="flex h-screen min-h-[600px] bg-background text-foreground">
       <Sidebar
-        page={page} labelId={labelId} labels={labels}
+        page={page}
         counts={{ today: agenda.open, notes: allNotes.length, bin: bin.length }}
-        onPage={setPage} onLabel={setLabelId} isDark={theme.isDark} onToggleTheme={() => void theme.toggle()}
+        onPage={setPage} isDark={theme.isDark} onToggleTheme={() => void theme.toggle()}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <main className="min-h-0 flex-1 overflow-y-auto">
@@ -69,15 +69,13 @@ function Screen() {
             {(page === "notes" || page === "archive") && (
               <NotesPage
                 archived={page === "archive"} labelId={page === "notes" ? labelId : null} {...(labelName ? { labelName } : {})}
+                labels={labels} onLabel={setLabelId}
                 sort={sort} layout={layout} onSort={setSort} onLayout={setLayout}
                 onOpen={setEditing} onNew={() => void newNote()} onNavigate={setPage}
               />
             )}
             {page === "today" && (
-              <TodayOverviewPage
-                onNavigate={setPage} onOpen={setEditing} onPin={(id, p) => void actions.pin(id, p)}
-                onArchive={(id, a) => void actions.archive(id, a)} onDelete={(id) => void actions.remove(id)}
-              />
+              <TodayOverviewPage />
             )}
             {page === "bin" && <BinPage />}
             {page === "character" && <CharacterPage />}

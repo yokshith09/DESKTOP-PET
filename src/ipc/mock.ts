@@ -1,6 +1,7 @@
 // In-memory stand-in for the Rust shell, used only by `vite dev` outside Tauri.
 import { daysAgo, ymd } from "../lib/dates";
 import type {
+  AppUsage, DomainUsage, TimeRange, UsageSummary,
   AppError, BinNote, DailyLog, LogEntry, Reminder, Label, LoafEvent, Note, NoteColor, NoteSummary, Task, TaskRow, TaskStatus,
 } from "./types";
 
@@ -78,6 +79,7 @@ export function createMock() {
     "general.autostart": false, "general.theme": "dark", "general.font_size": "M",
     "pet.visible": true, "pet.size": "M", "pet.opacity": 100, "pet.always_on_top": true,
     "shortcuts.global_open": null, "shortcuts.global_new_note": null, "shortcuts.global_new_task": null,
+    "tracking.apps": true, "tracking.exclude_apps": [],
     "advanced.log_level": "info",
   };
   /** Deterministic sample history so the Time screen has something to show. */
@@ -123,11 +125,85 @@ export function createMock() {
     };
   }
 
+
+  // ---- sample time tracking ------------------------------------------------------------------
+  interface Sess { app: string; category: string; is_browser: boolean; domain?: string; start: number; end: number }
+  const APPS: { app: string; category: string; is_browser: boolean; spans: [number, number][] }[] = [
+    { app: "VS Code", category: "Coding", is_browser: false, spans: [[9, 11.5], [13.5, 16.25]] },
+    { app: "Figma", category: "Design", is_browser: false, spans: [[11.5, 12.5], [16.25, 17]] },
+    { app: "Google Chrome", category: "Research", is_browser: true, spans: [[8.5, 9], [12.5, 13.5], [17, 18.25]] },
+    { app: "Slack", category: "Communication", is_browser: false, spans: [[9.9, 10.1], [13.2, 13.5], [15.1, 15.3]] },
+    { app: "Notion", category: "Notes", is_browser: false, spans: [[16.4, 16.9]] },
+    { app: "Windows Terminal", category: "Coding", is_browser: false, spans: [[11, 11.4], [14.2, 14.6]] },
+  ];
+  const DOMAINS: { domain: string; category: string; share: number }[] = [
+    { domain: "github.com", category: "Coding", share: 0.4 },
+    { domain: "stackoverflow.com", category: "Research", share: 0.25 },
+    { domain: "youtube.com", category: "Entertainment", share: 0.2 },
+    { domain: "docs.google.com", category: "Notes", share: 0.15 },
+  ];
+  function sessionsFor(from: number, to: number): Sess[] {
+    const out: Sess[] = [];
+    const first = new Date(from); first.setHours(0, 0, 0, 0);
+    for (let day = first.getTime(); day < to; day += 86_400_000) {
+      const d = new Date(day);
+      const k = (d.getDate() * 7 + d.getMonth() * 3) % 5;
+      for (const a of APPS) {
+        a.spans.forEach(([s, e], i) => {
+          const trim = ((k + i) % 3) * 0.12;
+          const start = day + s * 3_600_000, end = Math.min(day + (e - trim) * 3_600_000, now());
+          if (end <= start) return;
+          out.push({ app: a.app, category: a.category, is_browser: a.is_browser, start, end });
+          if (a.is_browser) {
+            let cursor = start;
+            for (const dm of DOMAINS) {
+              const len = (end - start) * dm.share;
+              out.push({ app: a.app, category: dm.category, is_browser: true, domain: dm.domain, start: cursor, end: cursor + len });
+              cursor += len;
+            }
+          }
+        });
+      }
+    }
+    return out.filter((x) => x.end > from && x.start < to);
+  }
+  const clip = (x: Sess, from: number, to: number) => Math.max(0, Math.min(x.end, to) - Math.max(x.start, from));
+  function summarize(from: number, to: number): UsageSummary {
+    const list = sessionsFor(from, to);
+    const apps = new Map<string, AppUsage>();
+    const domains = new Map<string, DomainUsage>();
+    const hourly = new Array<number>(24).fill(0);
+    for (const x of list) {
+      const sec = clip(x, from, to) / 1000;
+      if (x.domain) {
+        const cur = domains.get(x.domain) ?? { domain: x.domain, browser: x.app, category: x.category, total_seconds: 0, sessions: 0 };
+        cur.total_seconds += sec; cur.sessions += 1; domains.set(x.domain, cur);
+      } else {
+        const cur = apps.get(x.app) ?? { app: x.app, category: x.category, is_browser: x.is_browser, total_seconds: 0, sessions: 0 };
+        cur.total_seconds += sec; cur.sessions += 1; apps.set(x.app, cur);
+        hourly[new Date(x.start).getHours()] = (hourly[new Date(x.start).getHours()] ?? 0) + sec;
+      }
+    }
+    const round = <T extends { total_seconds: number }>(v: T): T => ({ ...v, total_seconds: Math.round(v.total_seconds) });
+    const a = [...apps.values()].map(round).sort((p, q) => q.total_seconds - p.total_seconds);
+    return { total_seconds: a.reduce((n, v) => n + v.total_seconds, 0), apps: a, domains: [...domains.values()].map(round).sort((p, q) => q.total_seconds - p.total_seconds), hourly_seconds: hourly.map(Math.round) };
+  }
+  function ranges(pred: (x: Sess) => boolean, from: number, to: number): TimeRange[] {
+    return sessionsFor(from, to).filter(pred).map((x) => ({ started_at: Math.max(x.start, from), ended_at: Math.min(x.end, to) })).sort((p, q) => p.started_at - q.started_at);
+  }
+  const prefs = new Map<string, unknown>();
+
   const handlers: Record<string, (a: Record<string, unknown>) => unknown> = {
     settings_get_all: () => settings,
     setting_set: (a) => { settings[String(a.key)] = a.value; emit("SettingChanged"); return null; },
-    prefs_get: () => null,
-    prefs_set: () => null,
+    prefs_get: (a) => prefs.get(String(a.key)) ?? null,
+    prefs_set: (a) => { prefs.set(String(a.key), a.value); return null; },
+    usage_summary: (a) => summarize(Number(a.from), Number(a.to)),
+    usage_app_sessions: (a) => ranges((x) => x.app === a.app && !x.domain, Number(a.from), Number(a.to)),
+    usage_domain_sessions: (a) => ranges((x) => x.domain === a.domain, Number(a.from), Number(a.to)),
+    tracking_status: () => ({ supported: true, running: settings["tracking.apps"] === true, enabled: settings["tracking.apps"] === true }),
+    usage_delete: () => null,
+    open_url: (a) => { window.open(String(a.url), "_blank", "noopener"); return null; },
 
     notes_list: (a) => {
       const sorted = notes
@@ -212,7 +288,7 @@ export function createMock() {
 
     tasks_query: (a) => {
       const open = (x: Task) => x.status !== "CANCELLED" && x.status !== "COMPLETED";
-      const rows = a.view === "all" ? tasks : tasks.filter((x) => open(x) && (x.status === "IN_PROGRESS" || x.planned_date === today || (!!x.due_date && x.due_date < today)));
+      const rows = a.view === "all" ? tasks : a.view === "upcoming" ? tasks.filter((x) => open(x) && !!x.planned_date && x.planned_date > today) : tasks.filter((x) => open(x) && (x.status === "IN_PROGRESS" || x.planned_date === today || (!!x.due_date && x.due_date < today)));
       return rows.map<TaskRow>((task) => ({ task, overdue: !!task.due_date && task.due_date < today && open(task) }));
     },
     task_quick_add: (a) => { const x = t(`t${++seq}`, String(a.title), null, today, null, "PLANNED"); tasks.push(x); emit("TaskCreated"); return x; },

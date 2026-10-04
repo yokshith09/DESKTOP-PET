@@ -1,134 +1,127 @@
 import { useState } from "react";
-import { Info } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Check, ChevronDown, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Bars, type Bar } from "@/features/charts/Bars";
-import { Ring } from "@/features/charts/Ring";
 import { PageHeader, Tile } from "@/features/shell/PageHeader";
-import { useRecentLogs } from "@/hooks/useLoaf";
-import { dayLabel, weekdayShort, ymd } from "@/lib/dates";
+import { useRecentLogs, useTrackingStatus, useUsage } from "@/hooks/useLoaf";
+import { dayLabel, weekdayNarrow, ymd } from "@/lib/dates";
+import { formatDuration } from "@/lib/time";
 import { cn } from "@/lib/utils";
-import type { DailyLog, LogEntry } from "@/ipc";
+import { CATEGORIES, categoryStyle } from "./categories";
+import { RANGES, rangeBounds, type RangeKey } from "./range";
+import { TimeCard } from "./TimeCard";
 
-const DAYS = 14;
-const PRIORITY_GLYPH = { HIGH: "▲", MEDIUM: "■", LOW: "▼" } as const;
-
-function statusRows(log: DailyLog | null) {
-  const s = log?.snapshot;
-  return [
-    { label: "Completed", n: s?.completed.length ?? 0, cls: "bg-success" },
-    { label: "In progress", n: s?.in_progress.length ?? 0, cls: "bg-primary" },
-    { label: "Planned", n: s?.planned.length ?? 0, cls: "bg-foreground/30" },
-    { label: "Pending", n: s?.pending.length ?? 0, cls: "bg-violet" },
-    { label: "Cancelled", n: s?.cancelled.length ?? 0, cls: "bg-foreground/15" },
-    { label: "Overdue", n: s?.overdue.length ?? 0, cls: "bg-destructive" },
-  ];
+function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string | undefined }) {
+  return (
+    <div className="rounded-xl border bg-card p-4">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="mt-2 truncate text-[26px] font-semibold leading-none tracking-tight tabular-nums">{value}</p>
+      {sub && <p className="mt-1.5 truncate text-xs text-muted-foreground">{sub}</p>}
+    </div>
+  );
 }
 
-/** Daily logs, laid out like a phone's Digital Wellbeing: pick a day, see how it went. */
+/** Time: where it went, per app and site, with filters. */
 export function TimePage() {
-  const days = useRecentLogs(DAYS);
-  const [selected, setSelected] = useState(String(DAYS - 1));
-  const idx = Number(selected);
-  const current = days[idx];
-  const log = current?.log ?? null;
-  const stats = log?.snapshot.stats;
-  const week = days.slice(-7);
-  const perDay = (l: DailyLog | null) => l?.snapshot.stats.completed_count ?? 0;
-  const avg = week.reduce((a, d) => a + perDay(d.log), 0) / 7;
+  const [range, setRange] = useState<RangeKey>("today");
+  const [category, setCategory] = useState<string>("all");
+  const [view, setView] = useState<"apps" | "sites">("apps");
+  const { from, to, days } = rangeBounds(range);
+  const { data: status } = useTrackingStatus();
+  const { data: usage } = useUsage(from, to);
+  const logs = useRecentLogs(30);
 
-  const bars: Bar[] = week.map((d, i) => ({
-    key: String(DAYS - 7 + i), value: perDay(d.log), label: weekdayShort(d.date).slice(0, 3),
-    title: `${dayLabel(d.date)}: ${perDay(d.log)} completed`,
+  const cat = category === "all" ? null : category;
+  const apps = (usage?.apps ?? []).filter((a) => !cat || a.category === cat);
+  const total = apps.reduce((n, a) => n + a.total_seconds, 0);
+  const byCategory = new Map<string, number>();
+  for (const a of usage?.apps ?? []) byCategory.set(a.category, (byCategory.get(a.category) ?? 0) + a.total_seconds);
+  const categories = [...byCategory.entries()].sort((a, b) => b[1] - a[1]);
+  const all = categories.reduce((n, [, v]) => n + v, 0) || 1;
+
+  const inRange = logs.filter(({ date }) => date.getTime() >= from && date.getTime() < to);
+  const done = inRange.reduce((n, d) => n + (d.log?.snapshot.stats.completed_count ?? 0), 0);
+  const planned = inRange.reduce((n, d) => n + (d.log?.snapshot.stats.planned_count ?? 0), 0);
+  const barDays = logs.slice(-Math.max(7, days));
+  const bars: Bar[] = barDays.map(({ date, log }) => ({
+    key: ymd(date), value: log?.snapshot.stats.completed_count ?? 0, label: days > 7 ? String(date.getDate()) : weekdayNarrow(date),
+    active: date.getTime() >= from && date.getTime() < to, title: `${dayLabel(date)}: ${log?.snapshot.stats.completed_count ?? 0} completed`,
   }));
-  const hours = Array.from({ length: 24 }, (_, h) => (log?.snapshot.completed ?? []).filter((e) => e.completed_at && new Date(e.completed_at).getHours() === h).length);
-  const maxHour = Math.max(1, ...hours);
-  const entries: LogEntry[] = log ? [...log.snapshot.completed, ...log.snapshot.in_progress, ...log.snapshot.planned, ...log.snapshot.pending, ...log.snapshot.cancelled] : [];
-  const rows = statusRows(log);
-  const total = Math.max(1, rows.reduce((a, r) => a + r.n, 0));
+  const tracking = status?.enabled ?? false;
+  const filtered = category !== "all" || range !== "today" || view !== "apps";
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Time" description="Your daily logs. Pick a day to see how it went." />
+      <PageHeader title="Time" description="Where your time went, by app and site." />
 
-      <div role="tablist" aria-label="Days" className="flex gap-1.5 overflow-x-auto pb-1"
-        onKeyDown={(e) => {
-          if (e.key === "ArrowLeft") setSelected(String(Math.max(0, idx - 1)));
-          if (e.key === "ArrowRight") setSelected(String(Math.min(DAYS - 1, idx + 1)));
-        }}>
-        {days.map(({ date, log: l }, i) => {
-          const r = l?.snapshot.stats.completion_ratio ?? 0;
-          const on = String(i) === selected;
-          return (
-            <button key={ymd(date)} type="button" role="tab" aria-selected={on} tabIndex={on ? 0 : -1} onClick={() => setSelected(String(i))}
-              className={cn("flex w-[68px] shrink-0 flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", on ? "border-primary/60 bg-primary/10" : "bg-card hover:border-foreground/25")}>
-              <span className="text-[11px] text-muted-foreground">{i === DAYS - 1 ? "Today" : weekdayShort(date)}</span>
-              <span className="text-sm font-semibold tabular-nums">{date.getDate()}</span>
-              <span className="h-1 w-8 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${r * 100}%` }} /></span>
-            </button>
-          );
-        })}
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filters">
+        <ToggleGroup type="single" value={range} onValueChange={(v) => v && setRange(v as RangeKey)} aria-label="Period">
+          {RANGES.map((r) => <ToggleGroupItem key={r.key} value={r.key}>{r.label}</ToggleGroupItem>)}
+        </ToggleGroup>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8">
+              {category === "all" ? "All categories" : (<><span className={cn("size-2 rounded-full", categoryStyle(category).dot)} />{category}</>)}<ChevronDown />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuRadioGroup value={category} onValueChange={setCategory}>
+              <DropdownMenuRadioItem value="all">All categories</DropdownMenuRadioItem>
+              {CATEGORIES.map((c) => <DropdownMenuRadioItem key={c} value={c}>{c}</DropdownMenuRadioItem>)}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as "apps" | "sites")} aria-label="Group by">
+          <ToggleGroupItem value="apps">Apps</ToggleGroupItem>
+          <ToggleGroupItem value="sites">Sites</ToggleGroupItem>
+        </ToggleGroup>
+        {filtered && (
+          <Button variant="ghost" size="sm" onClick={() => { setRange("today"); setCategory("all"); setView("apps"); }}>Reset filters</Button>
+        )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-72">
-        <Tile className="lg:col-span-4" title={current ? dayLabel(current.date) : "Day"}
-          action={log?.reconstructed ? <Badge variant="violet">Reconstructed</Badge> : log?.live ? <Badge variant="primary">Live</Badge> : undefined}
-          bodyClassName="flex items-center gap-5 p-4">
-          <Ring value={stats?.completion_ratio ?? null} size={120}>
-            <div>
-              <p className="text-2xl font-semibold leading-none tabular-nums">{stats?.completion_ratio != null ? Math.round(stats.completion_ratio * 100) : "—"}{stats?.completion_ratio != null && <span className="text-sm">%</span>}</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">completed</p>
-            </div>
-          </Ring>
-          <div className="min-w-0 space-y-1 text-[13px]">
-            <p><span className="font-semibold tabular-nums">{stats?.completed_count ?? 0}</span> of <span className="tabular-nums">{stats?.planned_count ?? 0}</span> tasks</p>
-            <p className="text-muted-foreground"><span className="tabular-nums">{stats?.notes_created ?? 0}</span> notes written</p>
-            <p className="text-muted-foreground"><span className="tabular-nums">{stats?.notes_edited ?? 0}</span> notes edited</p>
-            <p className="text-muted-foreground"><span className="tabular-nums">{stats?.meetings ?? 0}</span> meetings</p>
-          </div>
-        </Tile>
-        <Tile className="lg:col-span-8" title="Tasks completed" action={<span className="text-[11px] text-muted-foreground">Dashed line: {avg.toFixed(1)} per day</span>} bodyClassName="flex p-4">
-          <Bars bars={bars} average={avg} selectedKey={selected} onSelect={setSelected} className="flex-1" ariaLabel={`Tasks completed per day: ${bars.map((b) => b.value).join(", ")}`} />
-        </Tile>
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <Stat label="Total time" value={tracking ? formatDuration(total) : "—"} sub={tracking ? `${days === 1 ? "in the day" : `~${formatDuration(total / days)} a day`}` : "Tracking is off"} />
+        <Stat label="Apps used" value={tracking ? apps.length : "—"} sub={tracking && usage?.domains.length ? `${usage.domains.length} sites visited` : undefined} />
+        <Stat label="Most used" value={tracking ? (apps[0]?.app ?? "—") : "—"} sub={apps[0] ? `${formatDuration(apps[0].total_seconds)} · ${apps[0].category}` : undefined} />
+        <Stat label="Tasks done" value={done} sub={planned ? `of ${planned} planned` : "in this period"} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-12">
-        <Tile className="lg:col-span-7 lg:h-96" title="When you got things done" bodyClassName="p-4">
-          <div className="grid grid-cols-24 gap-1" style={{ gridTemplateColumns: "repeat(24, minmax(0, 1fr))" }} role="img" aria-label="Tasks completed by hour of day">
-            {hours.map((n, h) => (
-              <div key={h} title={`${h}:00 · ${n} completed`} className="h-10 rounded-[3px] bg-primary" style={{ opacity: n === 0 ? 0.08 : 0.25 + (n / maxHour) * 0.75 }} />
-            ))}
-          </div>
-          <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>11 PM</span></div>
-          <ul className="mt-5 space-y-2.5">
-            {rows.map((r) => (
-              <li key={r.label} className="flex items-center gap-3 text-[13px]">
-                <span className="w-24 text-muted-foreground">{r.label}</span>
-                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><span className={cn("block h-full rounded-full", r.cls)} style={{ width: `${(r.n / total) * 100}%` }} /></span>
-                <span className="w-6 text-right tabular-nums">{r.n}</span>
-              </li>
-            ))}
-          </ul>
-        </Tile>
-        <Tile className="lg:col-span-5 lg:h-96" title="Log" count={entries.length}>
-          {entries.length === 0 ? (
-            <p className="px-2 py-8 text-center text-[13px] text-muted-foreground">No tasks were planned on this day.</p>
+      <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-[30rem]">
+        <TimeCard from={from} to={to} category={cat} view={view} className="lg:col-span-8" title={view === "sites" ? "Sites" : "Apps"} />
+        <Tile className="lg:col-span-4" title="By category" bodyClassName="p-4">
+          {categories.length === 0 ? (
+            <p className="py-10 text-center text-[13px] text-muted-foreground">{tracking ? "Nothing recorded yet." : "Turn on app tracking to see this."}</p>
           ) : (
-            <ul className="-mx-1">
-              {entries.map((e) => (
-                <li key={e.id} className="flex h-9 items-center gap-2.5 rounded-md px-2 hover:bg-accent/50">
-                  <span className={cn("size-2 shrink-0 rounded-full", e.status_at_eod === "COMPLETED" ? "bg-success" : "bg-foreground/25")} />
-                  <span className="min-w-0 flex-1 truncate text-[13px]">{e.title}</span>
-                  {e.priority && <span className="text-[11px] text-muted-foreground" aria-label={`${e.priority} priority`}>{PRIORITY_GLYPH[e.priority]}</span>}
-                  <span className="w-16 text-right text-[11px] tabular-nums text-muted-foreground">
-                    {e.completed_at ? new Date(e.completed_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <>
+              <div className="flex h-3 overflow-hidden rounded-full bg-muted" role="img" aria-label="Share of time by category">
+                {categories.map(([c, v]) => <span key={c} className={cn("h-full", categoryStyle(c).bar)} style={{ width: `${(v / all) * 100}%` }} />)}
+              </div>
+              <ul className="mt-4 space-y-1">
+                {categories.map(([c, v]) => (
+                  <li key={c}>
+                    <button type="button" onClick={() => setCategory(category === c ? "all" : c)} aria-pressed={category === c}
+                      className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring">
+                      <span className={cn("size-2 rounded-full", categoryStyle(c).dot)} />
+                      <span className="flex-1">{c}</span>
+                      {category === c && <Check className="size-3.5 text-primary" />}
+                      <span className="tabular-nums text-muted-foreground">{Math.round((v / all) * 100)}%</span>
+                      <span className="w-14 text-right font-medium tabular-nums">{formatDuration(v)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </Tile>
       </div>
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Info className="size-3.5" />App and browser time will appear here in a later release.</p>
+
+      <Tile className="h-64" title="Tasks completed" action={<span className="text-[11px] text-muted-foreground">{done} in this period</span>} bodyClassName="flex p-4">
+        <Bars bars={bars} className="flex-1" ariaLabel={`Tasks completed per day: ${bars.map((b) => b.value).join(", ")}`} />
+      </Tile>
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Info className="size-3.5" />Time is recorded on this computer only. Window titles and full web addresses are never stored.</p>
     </div>
   );
 }

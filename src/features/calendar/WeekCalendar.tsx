@@ -10,6 +10,7 @@ interface Item { id: string; title: string; kind: Kind; at: number; done: boolea
 
 const DOT: Record<Kind, string> = { task: "bg-foreground/40", reminder: "bg-primary", deadline: "bg-destructive" };
 const MAX_PER_DAY = 3;
+const EDGE: Record<Kind, string> = { task: "border-foreground/30", reminder: "border-primary", deadline: "border-destructive" };
 
 /** Monday of the week containing `d`. */
 export function startOfWeek(d: Date): Date {
@@ -19,7 +20,7 @@ export function startOfWeek(d: Date): Date {
 }
 
 /** This week, Monday to Sunday: tasks by planned date, deadlines by due date, reminders by time. */
-export function WeekCalendar() {
+export function WeekCalendar({ className }: { className?: string }) {
   const { data: tasks = [] } = useAllTasks();
   const { data: reminders = [] } = useReminders(false);
   const todayKey = ymd(new Date());
@@ -45,7 +46,7 @@ export function WeekCalendar() {
 
   return (
     <Tile
-      title="This week" count={[...byDay.entries()].filter(([k]) => days.some((d) => ymd(d) === k)).reduce((n, [, v]) => n + v.length, 0)}
+      className={className} title="This week" count={[...byDay.entries()].filter(([k]) => days.some((d) => ymd(d) === k)).reduce((n, [, v]) => n + v.length, 0)}
       action={<span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><CalendarDays className="size-3.5" />{range}</span>}
       bodyClassName="p-0" footer={
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground" aria-label="Legend">
@@ -55,25 +56,26 @@ export function WeekCalendar() {
         </ul>
       }
     >
-      <div className="grid grid-cols-7 divide-x" role="grid" aria-label="This week">
+      <div className="grid h-full grid-cols-7 divide-x" role="grid" aria-label="This week">
         {days.map((d) => {
           const key = ymd(d);
           const items = byDay.get(key) ?? [];
           const isToday = key === todayKey;
           return (
-            <div key={key} role="gridcell" aria-label={d.toDateString()} className={cn("min-h-40 min-w-0 p-2", isToday && "bg-primary/[0.06]")}>
-              <div className="mb-2 flex flex-col items-center">
-                <span className={cn("text-[11px]", isToday ? "font-medium text-primary" : "text-muted-foreground")}>{d.toLocaleDateString([], { weekday: "short" })}</span>
-                <span className={cn("mt-0.5 grid size-7 place-items-center rounded-full text-sm font-semibold tabular-nums", isToday && "bg-primary text-primary-foreground")}>{d.getDate()}</span>
+            <div key={key} role="gridcell" aria-label={d.toDateString()} className={cn("relative flex min-w-0 flex-col p-2", isToday && "bg-primary/[0.06]")}>
+              {isToday && <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 bg-primary" />}
+              <div className="mb-2 flex items-baseline justify-between px-0.5">
+                <span className={cn("text-[11px]", isToday ? "font-semibold text-primary" : "text-muted-foreground")}>{d.toLocaleDateString([], { weekday: "short" })}</span>
+                <span className={cn("text-sm font-semibold tabular-nums", isToday ? "text-primary" : "text-foreground")}>{d.getDate()}</span>
               </div>
               <ul className="space-y-1">
                 {items.slice(0, MAX_PER_DAY).map((it) => (
-                  <li key={it.id} title={it.title} className={cn("flex items-start gap-1.5 rounded-md bg-muted/70 px-1.5 py-1 text-[11px] leading-[14px]", it.done && "opacity-50 line-through")}>
-                    {it.kind === "reminder" ? <Bell className="mt-px size-2.5 shrink-0 text-primary" /> : <span className={cn("mt-1 size-1.5 shrink-0 rounded-full", DOT[it.kind])} />}
+                  <li key={it.id} title={it.title} className={cn("flex items-start gap-1 rounded-[5px] border-l-2 bg-muted/60 px-1.5 py-1 text-[11px] leading-[14px]", EDGE[it.kind], it.done && "opacity-50 line-through")}>
+                    {it.kind === "reminder" && <Bell className="mt-px size-2.5 shrink-0 text-primary" />}
                     <span className="line-clamp-2 min-w-0">{it.title}</span>
                   </li>
                 ))}
-                {items.length > MAX_PER_DAY && <li className="px-1.5 text-[11px] text-muted-foreground">+{items.length - MAX_PER_DAY} more</li>}
+                {items.length > MAX_PER_DAY && <li className="px-1 text-[11px] text-muted-foreground">+{items.length - MAX_PER_DAY} more</li>}
               </ul>
             </div>
           );

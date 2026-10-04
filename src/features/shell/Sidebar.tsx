@@ -2,18 +2,14 @@ import {
   Archive, Clock3, LayoutDashboard, Moon, NotebookPen, PawPrint, Plug, Settings, Sun, Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { LabelCount } from "@/ipc";
 import { Bear } from "./Bear";
 
 export type Page = "today" | "time" | "notes" | "archive" | "bin" | "character" | "mcp" | "settings";
 
 interface Props {
   page: Page;
-  labelId: string | null;
-  labels: LabelCount[];
   counts: { today: number; notes: number; bin: number };
   onPage: (p: Page) => void;
-  onLabel: (id: string | null) => void;
   isDark: boolean;
   onToggleTheme: () => void;
 }
@@ -50,14 +46,8 @@ function Group({ title, children }: { title?: string; children: React.ReactNode 
   );
 }
 
-const DOTS = ["bg-sky-400", "bg-emerald-400", "bg-amber-400", "bg-fuchsia-400", "bg-rose-400", "bg-teal-400", "bg-violet-400"];
-const dotFor = (name: string) => DOTS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % DOTS.length] ?? "bg-sky-400";
-
-export function Sidebar({ page, labelId, labels, counts, onPage, onLabel, isDark, onToggleTheme }: Props) {
-  const go = (p: Page) => () => {
-    onLabel(null);
-    onPage(p);
-  };
+export function Sidebar({ page, counts, onPage, isDark, onToggleTheme }: Props) {
+  const go = (p: Page) => () => onPage(p);
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r bg-[var(--sidebar)] px-3 pb-3 pt-3.5">
       <div className="mb-3 flex items-center gap-2.5 px-1.5">
@@ -71,7 +61,7 @@ export function Sidebar({ page, labelId, labels, counts, onPage, onLabel, isDark
       <Group>
         <Item active={page === "today"} onClick={go("today")} icon={<LayoutDashboard />} count={counts.today}>Today overview</Item>
         <Item active={page === "time"} onClick={go("time")} icon={<Clock3 />}>Time</Item>
-        <Item active={page === "notes" && labelId === null} onClick={go("notes")} icon={<NotebookPen />} count={counts.notes}>Notes</Item>
+        <Item active={page === "notes"} onClick={go("notes")} icon={<NotebookPen />} count={counts.notes}>Notes</Item>
         <Item active={page === "character"} onClick={go("character")} icon={<PawPrint />}>Character</Item>
         <Item active={page === "mcp"} onClick={go("mcp")} icon={<Plug />}>MCP</Item>
       </Group>
@@ -80,25 +70,6 @@ export function Sidebar({ page, labelId, labels, counts, onPage, onLabel, isDark
         <Item active={page === "archive"} onClick={go("archive")} icon={<Archive />}>Archive</Item>
         <Item active={page === "bin"} onClick={go("bin")} icon={<Trash2 />} count={counts.bin}>Bin</Item>
       </Group>
-
-      {labels.length > 0 && (
-        <Group title="Labels">
-          {labels.map(({ label, count }) => (
-            <Item
-              key={label.id}
-              active={page === "notes" && labelId === label.id}
-              onClick={() => {
-                onPage("notes");
-                onLabel(label.id);
-              }}
-              icon={<span aria-hidden className={cn("size-2 rounded-full", dotFor(label.name))} />}
-              count={count}
-            >
-              {label.name}
-            </Item>
-          ))}
-        </Group>
-      )}
 
       <div className="mt-auto space-y-0.5 border-t pt-3">
         <div className="flex items-center gap-1">

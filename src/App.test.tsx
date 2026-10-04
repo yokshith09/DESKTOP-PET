@@ -1,7 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { App } from "./App";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 beforeAll(() => {
   // jsdom lacks these; Radix and the theme hook use them.
@@ -14,6 +13,13 @@ beforeAll(() => {
 });
 afterEach(cleanup);
 
+// A fresh in-memory shell (and so fresh preferences) for every test.
+let App: typeof import("./App").App;
+beforeEach(async () => {
+  vi.resetModules();
+  ({ App } = await import("./App"));
+});
+
 /** Click a sidebar item (the Overview also has tiles with the same names). */
 async function goTo(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
   const side = await screen.findByRole("complementary");
@@ -22,13 +28,34 @@ async function goTo(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
 const openNotes = (user: ReturnType<typeof userEvent.setup>) => goTo(user, /^Notes/);
 
 describe("Notes screen (against the in-memory shell)", () => {
-  it("opens on Today overview, with Activity, and without search or New note", async () => {
+  it("opens on Today overview: agenda, progress, time and activity, without search or New note", async () => {
     render(<App />);
     expect(await screen.findByRole("region", { name: "Today’s agenda" })).toBeTruthy();
-    expect(await screen.findByRole("region", { name: "Activity" })).toBeTruthy();
-    expect(await within(await screen.findByRole("region", { name: "Pinned notes" })).findByRole("button", { name: "Loaf v1 scope" })).toBeTruthy();
+    for (const name of ["Progress", "Done this week", "Where your time went", "Activity"]) {
+      expect(await screen.findByRole("region", { name })).toBeTruthy();
+    }
     expect(screen.queryByRole("textbox", { name: "Search notes" })).toBeNull();
     expect(screen.queryByRole("button", { name: /New note/ })).toBeNull();
+  });
+
+  it("the Time card shows each app, expands a browser into sites, and opens the active spans", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const card = await screen.findByRole("region", { name: "Where your time went" });
+    await user.click(await within(card).findByRole("button", { name: /Show sites in Google Chrome/ }));
+    expect(await within(card).findByRole("button", { name: /^github\.com/ })).toBeTruthy();
+    await user.click(within(card).getByRole("button", { name: /^VS Code,/ }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(/Active from/)).toBeTruthy();
+  });
+
+  it("pasted links become shortcuts", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Add link" }));
+    await user.type(await screen.findByLabelText("Paste links"), "linear.app/team");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("button", { name: "Open linear.app" })).toBeTruthy();
   });
 
   it("Notes has search and New note, shows Today first, then the week, Pinned, and the rest", async () => {
@@ -44,12 +71,17 @@ describe("Notes screen (against the in-memory shell)", () => {
     expect(within(screen.getByRole("region", { name: "All notes" })).getByRole("button", { name: "Groceries" })).toBeTruthy();
   });
 
-  it("the Time page shows a daily log for the selected day", async () => {
+  it("the Time page filters by period and category", async () => {
     const user = userEvent.setup();
     render(<App />);
     await goTo(user, /^Time/);
-    expect(await screen.findByRole("tablist", { name: "Days" })).toBeTruthy();
-    expect(await screen.findByText(/tasks completed/i)).toBeTruthy();
+    const filters = await screen.findByRole("group", { name: "Filters" });
+    expect(within(filters).getByRole("radio", { name: "30 days" })).toBeTruthy();
+    expect(screen.queryByRole("tablist", { name: "Days" })).toBeNull();
+    await user.click(within(filters).getByRole("radio", { name: "7 days" }));
+    expect(await screen.findByRole("region", { name: "Apps" })).toBeTruthy();
+    await user.click(within(filters).getByRole("radio", { name: "Sites" }));
+    expect(await screen.findByRole("region", { name: "Sites" })).toBeTruthy();
   });
 
   it("unpinning moves a note out of Pinned", async () => {

@@ -20,8 +20,8 @@ export function Panel({ className = "", children }: { className?: string; childr
 export function Tile({
   title, count, action, tabs, footer, className = "", bodyClassName = "", children,
 }: {
-  title?: string; count?: ReactNode; action?: ReactNode; tabs?: ReactNode; footer?: ReactNode;
-  className?: string; bodyClassName?: string; children: ReactNode;
+  title?: string | undefined; count?: ReactNode; action?: ReactNode; tabs?: ReactNode; footer?: ReactNode;
+  className?: string | undefined; bodyClassName?: string | undefined; children: ReactNode;
 }) {
   return (
     <section aria-label={title} className={`flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card ${className}`}>

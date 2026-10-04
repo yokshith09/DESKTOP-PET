@@ -18,3 +18,11 @@ export type ReminderPatch = Partial<GeneratedReminderPatch>;
 
 /** One bus event as forwarded by the shell; only the tag matters to the UI. */
 export interface LoafEvent { type: string; at: number; [field: string]: unknown }
+
+// Time tracking (Phase 2 data, opt-in). Replace with the generated types once `pnpm gen:types` has them.
+export interface TimeRange { started_at: number; ended_at: number }
+export interface AppUsage { app: string; category: string; is_browser: boolean; total_seconds: number; sessions: number }
+export interface DomainUsage { domain: string; browser: string; category: string; total_seconds: number; sessions: number }
+export interface UsageSummary { total_seconds: number; apps: AppUsage[]; domains: DomainUsage[]; hourly_seconds: number[] }
+export interface TrackingStatus { supported: boolean; running: boolean; enabled: boolean }
+export interface Shortcut { id: string; url: string; label: string }
