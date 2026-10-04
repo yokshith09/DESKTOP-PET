@@ -1,7 +1,7 @@
 // Typed IPC client (F0-07): the only place that knows command names and argument shapes.
 import { call } from "./transport";
 import type {
-  BinNote, Reminder, ReminderInput, ReminderPatch, Label, LabelCount, Note, NoteInput, NotePatch, NoteSort, NoteSummary, Task, TaskRow,
+  BinNote, DailyLog, Reminder, ReminderInput, ReminderPatch, Label, LabelCount, Note, NoteInput, NotePatch, NoteSort, NoteSummary, Task, TaskRow,
   TaskStatus, TaskView,
 } from "./types";
 import type { Settings, SettingsKey } from "./settings";
@@ -42,5 +42,6 @@ export const ipc = {
 
   tasksQuery: (view: TaskView) => call<TaskRow[]>("tasks_query", { view }),
   taskQuickAdd: (title: string) => call<Task>("task_quick_add", { title }),
+  dailyLogGet: (date: string) => call<DailyLog | null>("daily_log_get", { date }),
   taskTransition: (id: string, to: TaskStatus) => call<Task>("task_transition", { id, to }),
 };

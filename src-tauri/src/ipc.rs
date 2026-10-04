@@ -4,7 +4,8 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use loaf_core::error::Result;
+use loaf_core::daily_log::{self, DailyLog};
+use loaf_core::error::{AppError, Result};
 use loaf_core::labels::{self, Label, LabelCount};
 use loaf_core::notes::{self, BinNote, Note, NoteInput, NotePatch, NoteSort, NoteSummary};
 use loaf_core::reminders::{self, Reminder, ReminderInput, ReminderPatch};
@@ -208,4 +209,14 @@ pub async fn task_quick_add(title: String, core: State<'_, Core>) -> Result<Task
 #[tauri::command]
 pub async fn task_transition(id: String, to: TaskStatus, core: State<'_, Core>) -> Result<Task> {
     tasks::transition(&core.db, &*core.clock, &id, to).await
+}
+
+// ---- daily logs (the Time screen) -----------------------------------------------------------
+
+/// The log for a local day `YYYY-MM-DD`: live for today, frozen for earlier days, `null` if none.
+#[tauri::command]
+pub async fn daily_log_get(date: String, core: State<'_, Core>) -> Result<Option<DailyLog>> {
+    let day = chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+        .map_err(|_| AppError::validation("date", "Dates look like 2026-10-04."))?;
+    daily_log::get(&core.db, &*core.clock, day).await
 }

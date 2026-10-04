@@ -125,3 +125,33 @@ export function NoteRow({ note, ...h }: { note: NoteSummary } & NoteHandlers) {
     </article>
   );
 }
+
+/** A pinned note: wider, taller, with an accent edge. Used only in the Pinned row. */
+export function PinnedCard({ note, ...h }: { note: NoteSummary } & NoteHandlers) {
+  const open = useOpen(note.id, h.onOpen);
+  return (
+    <article
+      role="button"
+      tabIndex={0}
+      aria-label={note.title || "Untitled note"}
+      data-note-color={note.color}
+      {...open}
+      className={cn(
+        "group relative flex min-h-36 cursor-pointer flex-col overflow-hidden rounded-xl border p-4 pt-[18px] text-left outline-none transition-colors hover:border-foreground/25 focus-visible:ring-2 focus-visible:ring-ring",
+        note.color === "default" ? "bg-card" : "note-tint",
+      )}
+    >
+      <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-primary" />
+      <div className="absolute right-2 top-3 hidden rounded-md border bg-popover/95 p-0.5 shadow-sm group-hover:flex group-focus-within:flex">
+        <Actions note={note} {...h} />
+      </div>
+      <Pin aria-label="Pinned" className="absolute right-3.5 top-4 size-3.5 rotate-45 fill-primary text-primary group-hover:hidden group-focus-within:hidden" />
+      <h3 className="mb-1.5 pr-6 text-[15px] font-semibold leading-snug tracking-tight">{note.title || "Untitled"}</h3>
+      <p className="line-clamp-3 whitespace-pre-line text-[13px] leading-relaxed text-foreground/75">{note.excerpt}</p>
+      <div className="mt-auto flex items-center gap-1.5 pt-3">
+        {note.labels.slice(0, 2).map((l) => <Badge key={l.id}>{l.name}</Badge>)}
+        <span className="ml-auto text-[11px] text-muted-foreground">{timeAgo(note.edited_at)}</span>
+      </div>
+    </article>
+  );
+}

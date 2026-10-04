@@ -1,6 +1,7 @@
 import { useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { daysAgo, ymd } from "@/lib/dates";
 import { errorMessage, ipc, onEvent, type NoteInput, type NotePatch, type NoteSort, type TaskStatus } from "@/ipc";
 
 export const keys = {
@@ -10,6 +11,7 @@ export const keys = {
   tasks: ["tasks", "today"] as const,
   search: (q: string, archived: boolean) => ["notes", "search", q, archived] as const,
   bin: ["bin"] as const,
+  log: (date: string) => ["log", date] as const,
   reminders: ["reminders"] as const,
   settings: ["settings"] as const,
 };
@@ -32,6 +34,9 @@ export function useBusSync() {
           void qc.invalidateQueries({ queryKey: ["note"] });
           void qc.invalidateQueries({ queryKey: keys.labels });
         }
+        if (e.type.startsWith("Task") || e.type.startsWith("Note") || e.type === "DayRolledOver" || e.type === "DailyLogFrozen") {
+          void qc.invalidateQueries({ queryKey: ["log"] });
+        }
         if (e.type.startsWith("Task")) void qc.invalidateQueries({ queryKey: ["tasks"] });
         if (e.type === "SettingChanged") void qc.invalidateQueries({ queryKey: keys.settings });
       }),
@@ -43,6 +48,15 @@ export const useNotes = (archived: boolean, labelId: string | null, sort: NoteSo
   useQuery({ queryKey: keys.notes(archived, labelId, sort), queryFn: () => ipc.notesList(archived, labelId, sort) });
 export const useSearch = (q: string, archived: boolean) =>
   useQuery({ queryKey: keys.search(q, archived), queryFn: () => ipc.notesSearch(q, archived), enabled: q.trim().length > 0 });
+export const useDailyLog = (date: string) =>
+  useQuery({ queryKey: keys.log(date), queryFn: () => ipc.dailyLogGet(date) });
+
+/** Logs for the last `n` days, oldest first (today is last). Missing days are null. */
+export function useRecentLogs(n: number) {
+  const days = Array.from({ length: n }, (_, i) => daysAgo(n - 1 - i));
+  const results = useQueries({ queries: days.map((d) => ({ queryKey: keys.log(ymd(d)), queryFn: () => ipc.dailyLogGet(ymd(d)) })) });
+  return days.map((d, i) => ({ date: d, log: results[i]?.data ?? null }));
+}
 export const useBin = () => useQuery({ queryKey: keys.bin, queryFn: ipc.binList });
 export const useReminders = (includeDone = false) =>
   useQuery({ queryKey: [...keys.reminders, includeDone], queryFn: () => ipc.remindersList(includeDone) });

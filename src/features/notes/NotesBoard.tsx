@@ -1,7 +1,7 @@
 import { NotebookPen, Pin, Plus, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { NoteSummary } from "@/ipc";
-import { NoteCard, NoteRow, type NoteHandlers } from "./NoteCard";
+import { NoteCard, NoteRow, PinnedCard, type NoteHandlers } from "./NoteCard";
 
 export type NotesLayout = "grid" | "list";
 
@@ -27,6 +27,20 @@ function Items({ notes, layout, ...h }: { notes: NoteSummary[]; layout: NotesLay
     );
   }
   return <div className="gap-3 [columns:16rem]">{notes.map((n) => <NoteCard key={n.id} note={n} {...h} />)}</div>;
+}
+
+/** Pinned notes: larger, accent-edged cards in one row, deliberately unlike the regular grid. */
+export function PinnedRow({ notes, ...h }: { notes: NoteSummary[] } & NoteHandlers) {
+  return (
+    <section aria-label="Pinned">
+      <h2 className="mb-2.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <Pin className="size-3 rotate-45 fill-primary text-primary" />Pinned<span className="tabular-nums text-muted-foreground/70">{notes.length}</span>
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {notes.map((n) => <PinnedCard key={n.id} note={n} {...h} />)}
+      </div>
+    </section>
+  );
 }
 
 export function Empty({ icon, title, hint, action }: { icon: React.ReactNode; title: string; hint: string; action?: React.ReactNode }) {
@@ -61,13 +75,9 @@ export function NotesBoard({
   const rest = split ? notes.filter((n) => !n.pinned) : notes;
   return (
     <div className="space-y-7">
-      {pinned.length > 0 && (
-        <Section title="Pinned" icon={<Pin className="size-3 rotate-45" />} count={pinned.length}>
-          <Items notes={pinned} layout={layout} {...h} />
-        </Section>
-      )}
+      {pinned.length > 0 && <PinnedRow notes={pinned} {...h} />}
       {rest.length > 0 && (
-        <Section title={pinned.length ? "Other notes" : mode === "search" ? "Results" : "Notes"} count={rest.length}>
+        <Section title={pinned.length ? "All notes" : mode === "search" ? "Results" : "Notes"} count={rest.length}>
           <Items notes={rest} layout={layout} {...h} />
         </Section>
       )}

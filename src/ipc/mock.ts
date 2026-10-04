@@ -1,6 +1,6 @@
 // In-memory stand-in for the Rust shell, used only by `vite dev` outside Tauri.
 import type {
-  AppError, BinNote, Reminder, Label, LoafEvent, Note, NoteColor, NoteSummary, Task, TaskRow, TaskStatus,
+  AppError, BinNote, DailyLog, LogEntry, Reminder, Label, LoafEvent, Note, NoteColor, NoteSummary, Task, TaskRow, TaskStatus,
 } from "./types";
 
 type Args = Record<string, unknown> | undefined;
@@ -72,6 +72,49 @@ export function createMock() {
     "shortcuts.global_open": null, "shortcuts.global_new_note": null, "shortcuts.global_new_task": null,
     "advanced.log_level": "info",
   };
+  /** Deterministic sample history so the Time screen has something to show. */
+  function sampleLog(date: string, back: number): DailyLog | null {
+    if (back === 0) return liveLog(date);
+    const seed = (back * 7 + 3) % 9;
+    const planned = 4 + (seed % 5);
+    const completed = Math.max(1, planned - (seed % 4));
+    const hours = [9, 10, 11, 13, 14, 15, 16, 17, 20];
+    const entry = (i: number, done: boolean): LogEntry => {
+      const d = new Date(date + "T00:00:00");
+      d.setHours(hours[(i + seed) % hours.length] ?? 10, (i * 17) % 60);
+      return {
+        id: `${date}-${i}`, title: ["Write the spec", "Review pull request", "Plan the week", "Inbox zero", "Fix the tray bug", "Draft release notes", "Prep the demo", "Refactor the store"][(i + seed) % 8] ?? "Task",
+        priority: (["HIGH", "MEDIUM", "LOW"] as const)[(i + seed) % 3] ?? null,
+        status_at_eod: done ? "COMPLETED" : "PLANNED", ...(done ? { completed_at: d.getTime() } : {}),
+      };
+    };
+    const done = Array.from({ length: completed }, (_, i) => entry(i, true));
+    const left = Array.from({ length: planned - completed }, (_, i) => entry(i + 20, false));
+    return {
+      date, live: false, reconstructed: back === 4,
+      snapshot: {
+        date, planned: left, in_progress: [], completed: done, pending: [], cancelled: [], overdue: [],
+        stats: { planned_count: planned, completed_count: completed, completion_ratio: Math.round((completed / planned) * 100) / 100, tasks_created: planned, notes_created: seed % 3, notes_edited: (seed + 1) % 4, meetings: seed % 2 },
+        activity: null,
+      },
+    };
+  }
+  function liveLog(date: string): DailyLog {
+    const open = tasks.filter((x) => x.status !== "COMPLETED" && x.status !== "CANCELLED");
+    const done = tasks.filter((x) => x.status === "COMPLETED");
+    const asEntry = (x: Task): LogEntry => ({ id: x.id, title: x.title, priority: x.priority, status_at_eod: x.status, ...(x.completed_at ? { completed_at: x.completed_at } : {}) });
+    const total = open.length + done.length;
+    return {
+      date, live: true, reconstructed: false,
+      snapshot: {
+        date, planned: open.filter((x) => x.status === "PLANNED").map(asEntry), in_progress: open.filter((x) => x.status === "IN_PROGRESS").map(asEntry),
+        completed: done.map(asEntry), pending: [], cancelled: [], overdue: open.filter((x) => x.due_date && x.due_date < date).map(asEntry),
+        stats: { planned_count: total, completed_count: done.length, completion_ratio: total ? Math.round((done.length / total) * 100) / 100 : null, tasks_created: total, notes_created: notes.filter((x) => x.created_at > now() - 12 * HOUR).length, notes_edited: 2, meetings: 0 },
+        activity: null,
+      },
+    };
+  }
+
   const handlers: Record<string, (a: Record<string, unknown>) => unknown> = {
     settings_get_all: () => settings,
     setting_set: (a) => { settings[String(a.key)] = a.value; emit("SettingChanged"); return null; },
@@ -161,6 +204,11 @@ export function createMock() {
 
     tasks_query: () => tasks.filter((x) => x.status !== "CANCELLED" && x.status !== "COMPLETED").map<TaskRow>((task) => ({ task, overdue: !!task.due_date && task.due_date < today && task.status !== "COMPLETED" })),
     task_quick_add: (a) => { const x = t(`t${++seq}`, String(a.title), null, today, null, "PLANNED"); tasks.push(x); emit("TaskCreated"); return x; },
+    daily_log_get: (a) => {
+      const d = new Date(String(a.date) + "T00:00:00");
+      const back = Math.round((new Date(today + "T00:00:00").getTime() - d.getTime()) / 86_400_000);
+      return back < 0 || back > 20 ? null : sampleLog(String(a.date), back);
+    },
     task_transition: (a) => {
       const x = tasks.find((y) => y.id === a.id) ?? fail("NOT_FOUND", "That task no longer exists.");
       x.status = a.to as TaskStatus; x.completed_at = x.status === "COMPLETED" ? now() : null;

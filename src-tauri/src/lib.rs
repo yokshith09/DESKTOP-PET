@@ -108,6 +108,7 @@ pub fn run() {
             ipc::tasks_query,
             ipc::task_quick_add,
             ipc::task_transition,
+            ipc::daily_log_get,
         ])
         .on_window_event(|window, event| {
             // Closing the main window hides it; the process keeps running (R0-03).

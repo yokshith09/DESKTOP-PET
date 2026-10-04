@@ -1,11 +1,11 @@
 import {
-  Archive, CalendarCheck2, Clock3, NotebookPen, PawPrint, Plug, Settings, Tag, Trash2,
+  Archive, CalendarCheck2, Clock3, LayoutDashboard, NotebookPen, PawPrint, Plug, Settings, Tag, Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LabelCount } from "@/ipc";
 import { Bear } from "./Bear";
 
-export type Page = "today" | "time" | "notes" | "archive" | "bin" | "character" | "mcp" | "settings";
+export type Page = "overview" | "today" | "time" | "notes" | "archive" | "bin" | "character" | "mcp" | "settings";
 
 interface Props {
   page: Page;
@@ -64,6 +64,7 @@ export function Sidebar({ page, labelId, labels, counts, onPage, onLabel }: Prop
       </div>
 
       <Group>
+        <Item active={page === "overview"} onClick={go("overview")} icon={<LayoutDashboard />}>Overview</Item>
         <Item active={page === "today"} onClick={go("today")} icon={<CalendarCheck2 />} count={counts.today}>Today</Item>
         <Item active={page === "time"} onClick={go("time")} icon={<Clock3 />}>Time</Item>
         <Item active={page === "notes" && labelId === null} onClick={go("notes")} icon={<NotebookPen />} count={counts.notes}>Notes</Item>

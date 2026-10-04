@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Clock3, Plug } from "lucide-react";
+import { Plug } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useBin, useBusSync, useLabels, useNoteActions, useNotes } from "@/hooks/useLoaf";
@@ -17,11 +17,13 @@ import { ComingSoon } from "@/features/shell/ComingSoon";
 import { Sidebar, type Page } from "@/features/shell/Sidebar";
 import { TopBar } from "@/features/shell/TopBar";
 import { TodayPage } from "@/features/tasks/TodayPage";
+import { TimePage } from "@/features/time/TimePage";
+import { OverviewPage } from "@/features/overview/OverviewPage";
 
-const PAGES: readonly Page[] = ["today", "time", "notes", "archive", "bin", "character", "mcp", "settings"];
+const PAGES: readonly Page[] = ["overview", "today", "time", "notes", "archive", "bin", "character", "mcp", "settings"];
 
 function Screen() {
-  const [page, setPageState] = useState<Page>("notes");
+  const [page, setPageState] = useState<Page>("overview");
   const [labelId, setLabelId] = useState<string | null>(null);
   const [sort, setSort] = useState<NoteSort>("last_edited");
   const [layout, setLayoutState] = useState<NotesLayout>("grid");
@@ -104,11 +106,17 @@ function Screen() {
                 onOpen={setEditing} onNew={() => void newNote()} onNavigate={setPage}
               />
             )}
+            {page === "overview" && (
+              <OverviewPage
+                onNavigate={setPage} onOpen={setEditing} onPin={(id, p) => void actions.pin(id, p)}
+                onArchive={(id, a) => void actions.archive(id, a)} onDelete={(id) => void actions.remove(id)}
+              />
+            )}
             {page === "today" && <TodayPage />}
             {page === "bin" && <BinPage />}
             {page === "character" && <CharacterPage />}
             {page === "settings" && <SettingsPage />}
-            {page === "time" && <ComingSoon icon={<Clock3 />} title="Time" description="Daily logs and time tracking will live here. Tell us what you want to see first." />}
+            {page === "time" && <TimePage />}
             {page === "mcp" && <ComingSoon icon={<Plug />} title="MCP" description="Connect external tools and services to Loaf through the Model Context Protocol. This arrives in a later release." />}
           </div>
         </main>

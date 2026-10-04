@@ -34,6 +34,7 @@ pub const SNAPSHOT_VERSION: u32 = 1;
 pub const LIVE_ROLLOVER_GRACE_MS: i64 = 60 * 60 * 1000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct LogEntry {
     pub id: String,
     pub title: String,
@@ -42,12 +43,14 @@ pub struct LogEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status_at_eod: Option<TaskStatus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(type = "number | null", optional))]
     pub completed_at: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub due_date: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Stats {
     pub planned_count: u32,
     pub completed_count: u32,
@@ -61,6 +64,7 @@ pub struct Stats {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Snapshot {
     pub date: String,
     pub planned: Vec<LogEntry>,
@@ -71,10 +75,12 @@ pub struct Snapshot {
     pub overdue: Vec<LogEntry>,
     pub stats: Stats,
     /// Work sessions and app/browser time arrive with Phase 2; until then this stays null (R1-46).
+    #[cfg_attr(feature = "ts", ts(type = "unknown | null"))]
     pub activity: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct DailyLog {
     pub date: String,
     /// Today's log: computed now, not yet frozen.

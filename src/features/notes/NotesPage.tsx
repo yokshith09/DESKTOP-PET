@@ -5,7 +5,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PageHeader } from "@/features/shell/PageHeader";
-import { Overview } from "@/features/overview/Overview";
+import { TodayStrip } from "./TodayStrip";
 import { useNoteActions, useNotes, useSearch } from "@/hooks/useLoaf";
 import type { NoteSort } from "@/ipc";
 import { NotesBoard, type NotesLayout } from "./NotesBoard";
@@ -32,7 +32,6 @@ export function NotesPage({ archived, labelId, labelName, query, sort, layout, o
   const searching = query.trim().length > 0;
   const list = useNotes(archived, labelId, sort);
   const found = useSearch(query, archived);
-  const { data: all = [] } = useNotes(false, null, "last_edited");
   const notes = (searching ? found.data : list.data) ?? [];
   const mode = searching ? "search" : archived ? "archive" : labelId ? "label" : "notes";
   const title = searching ? `Results for “${query.trim()}”` : archived ? "Archive" : (labelName ?? "Notes");
@@ -40,7 +39,7 @@ export function NotesPage({ archived, labelId, labelName, query, sort, layout, o
 
   return (
     <div className="space-y-6">
-      {mode === "notes" && <Overview notes={all} onNavigate={onNavigate} />}
+      {mode === "notes" && <TodayStrip onViewAll={() => onNavigate("today")} />}
       <div>
         <PageHeader
           title={title}

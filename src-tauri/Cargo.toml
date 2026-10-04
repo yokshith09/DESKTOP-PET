@@ -19,6 +19,7 @@ loaf-core = { path = "../crates/loaf-core" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.0", features = ["full"] }
+chrono = { version = "0.4", default-features = false, features = ["std"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-notification = "2"
 tracing = "0.1"
