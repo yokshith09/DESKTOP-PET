@@ -8,9 +8,9 @@ type Subscribe = (cb: (e: LoafEvent) => void) => () => void;
 let mock: { call: Handler; subscribe: Subscribe } | null = null;
 
 /** In `vite dev` outside Tauri the UI runs against an in-memory fake, so the screens can be
- *  designed and screenshotted without the Rust shell. It is dead code in production builds. */
+ *  designed and screenshotted without the Rust shell. It is dead code in production builds (unless built with VITE_MOCK for design previews). */
 async function loadMock() {
-  if (!mock && import.meta.env.DEV) mock = (await import("./mock")).createMock();
+  if (!mock && (import.meta.env.DEV || import.meta.env.VITE_MOCK)) mock = (await import("./mock")).createMock();
   return mock;
 }
 

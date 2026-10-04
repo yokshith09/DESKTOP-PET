@@ -18,6 +18,8 @@
         "url": "main.html",
         "width": 1200,
         "height": 800,
+        "center": true,
+        "maximized": true,
         "minWidth": 800,
         "minHeight": 600
       }

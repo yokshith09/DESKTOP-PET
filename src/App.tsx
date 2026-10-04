@@ -100,7 +100,7 @@ function Screen() {
               <NotesPage
                 archived={page === "archive"} labelId={page === "notes" ? labelId : null} {...(labelName ? { labelName } : {})}
                 query={debounced} sort={sort} layout={layout} onSort={setSort} onLayout={setLayout}
-                onOpen={setEditing} onNew={() => void newNote()} onOpenToday={() => setPage("today")}
+                onOpen={setEditing} onNew={() => void newNote()} onNavigate={setPage}
               />
             )}
             {page === "today" && <TodayPage />}

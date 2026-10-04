@@ -9,6 +9,7 @@ import { Overview } from "@/features/overview/Overview";
 import { useNoteActions, useNotes, useSearch } from "@/hooks/useLoaf";
 import type { NoteSort } from "@/ipc";
 import { NotesBoard, type NotesLayout } from "./NotesBoard";
+import type { Page } from "@/features/shell/Sidebar";
 
 const SORTS: Record<NoteSort, string> = { last_edited: "Last edited", created: "Date created", color: "Colour" };
 
@@ -23,14 +24,15 @@ interface Props {
   onLayout: (l: NotesLayout) => void;
   onOpen: (id: string) => void;
   onNew: () => void;
-  onOpenToday: () => void;
+  onNavigate: (p: Page) => void;
 }
 
-export function NotesPage({ archived, labelId, labelName, query, sort, layout, onSort, onLayout, onOpen, onNew, onOpenToday }: Props) {
+export function NotesPage({ archived, labelId, labelName, query, sort, layout, onSort, onLayout, onOpen, onNew, onNavigate }: Props) {
   const actions = useNoteActions();
   const searching = query.trim().length > 0;
   const list = useNotes(archived, labelId, sort);
   const found = useSearch(query, archived);
+  const { data: all = [] } = useNotes(false, null, "last_edited");
   const notes = (searching ? found.data : list.data) ?? [];
   const mode = searching ? "search" : archived ? "archive" : labelId ? "label" : "notes";
   const title = searching ? `Results for “${query.trim()}”` : archived ? "Archive" : (labelName ?? "Notes");
@@ -38,7 +40,7 @@ export function NotesPage({ archived, labelId, labelName, query, sort, layout, o
 
   return (
     <div className="space-y-6">
-      {mode === "notes" && <Overview onOpenToday={onOpenToday} />}
+      {mode === "notes" && <Overview notes={all} onNavigate={onNavigate} />}
       <div>
         <PageHeader
           title={title}
