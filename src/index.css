@@ -1,0 +1,169 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-violet: var(--violet);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --radius-2xl: calc(var(--radius) + 12px);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", Roboto, sans-serif;
+}
+
+/* Light: warm paper with a punchy crust-orange primary. */
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.975 0.008 85);
+  --foreground: oklch(0.2 0.02 285);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.02 285);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.02 285);
+  --primary: oklch(0.62 0.2 45);
+  --primary-foreground: oklch(0.99 0.01 85);
+  --secondary: oklch(0.95 0.012 85);
+  --secondary-foreground: oklch(0.25 0.02 285);
+  --muted: oklch(0.955 0.01 85);
+  --muted-foreground: oklch(0.48 0.02 285);
+  --accent: oklch(0.94 0.03 295);
+  --accent-foreground: oklch(0.3 0.12 295);
+  --destructive: oklch(0.55 0.22 27);
+  --border: oklch(0.9 0.012 85);
+  --input: oklch(0.9 0.012 85);
+  --ring: oklch(0.62 0.2 45);
+  --success: oklch(0.55 0.15 150);
+  --violet: oklch(0.55 0.22 295);
+  --sidebar: oklch(0.96 0.012 85);
+  /* note tint: lightness/chroma of the fill and of the edge */
+  --nl: 0.955;
+  --nc: 0.04;
+  --nbl: 0.85;
+  --nbc: 0.08;
+}
+
+/* Dark: ink-violet depth, amber and violet light. The default look. */
+.dark {
+  --background: oklch(0.15 0.025 285);
+  --foreground: oklch(0.97 0.01 85);
+  --card: oklch(0.2 0.028 285);
+  --card-foreground: oklch(0.97 0.01 85);
+  --popover: oklch(0.22 0.03 285);
+  --popover-foreground: oklch(0.97 0.01 85);
+  --primary: oklch(0.79 0.17 58);
+  --primary-foreground: oklch(0.2 0.04 50);
+  --secondary: oklch(0.26 0.03 285);
+  --secondary-foreground: oklch(0.96 0.01 85);
+  --muted: oklch(0.25 0.03 285);
+  --muted-foreground: oklch(0.72 0.03 285);
+  --accent: oklch(0.3 0.08 295);
+  --accent-foreground: oklch(0.92 0.06 295);
+  --destructive: oklch(0.7 0.19 22);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.79 0.17 58);
+  --success: oklch(0.78 0.16 155);
+  --violet: oklch(0.72 0.18 295);
+  --sidebar: oklch(0.175 0.027 285);
+  --nl: 0.29;
+  --nc: 0.06;
+  --nbl: 0.46;
+  --nbc: 0.11;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 20px;
+    letter-spacing: -0.005em;
+  }
+}
+
+/* Note colours: one hue per name, tinted by the theme's lightness/chroma. */
+[data-note-color] {
+  --nh: 260;
+}
+[data-note-color="red"] { --nh: 22; }
+[data-note-color="orange"] { --nh: 55; }
+[data-note-color="yellow"] { --nh: 95; }
+[data-note-color="green"] { --nh: 150; }
+[data-note-color="teal"] { --nh: 195; }
+[data-note-color="blue"] { --nh: 250; }
+[data-note-color="purple"] { --nh: 310; }
+[data-note-color="gray"] { --nh: 270; --nc: 0.012; --nbc: 0.015; }
+
+.note-tint {
+  background-image: linear-gradient(
+    155deg,
+    oklch(calc(var(--nl) + 0.035) var(--nc) var(--nh)),
+    oklch(var(--nl) var(--nc) var(--nh))
+  );
+  border-color: oklch(var(--nbl) var(--nbc) var(--nh) / 0.55);
+}
+.note-dot {
+  background: oklch(0.72 0.16 var(--nh));
+}
+
+/* Static, cheap depth: no blur, no filters (ADR-008). */
+.hero-mesh {
+  background-color: var(--card);
+  background-image:
+    radial-gradient(55% 140% at 92% -10%, oklch(0.62 0.2 295 / 0.5), transparent 70%),
+    radial-gradient(45% 120% at 8% 120%, oklch(0.78 0.17 55 / 0.38), transparent 70%),
+    radial-gradient(30% 60% at 60% 40%, oklch(0.7 0.15 330 / 0.12), transparent 70%);
+}
+:root:not(.dark) .hero-mesh {
+  background-image:
+    radial-gradient(55% 140% at 92% -10%, oklch(0.8 0.12 295 / 0.55), transparent 70%),
+    radial-gradient(45% 120% at 8% 120%, oklch(0.88 0.12 65 / 0.6), transparent 70%);
+}
+.brand-gradient {
+  background-image: linear-gradient(135deg, oklch(0.82 0.16 70), oklch(0.7 0.2 40) 55%, oklch(0.66 0.22 20));
+}
+
+@keyframes bob {
+  50% { transform: translateY(-6px); }
+}
+.bob { animation: bob 3.6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+.bear-wave { animation: bear-wave 0.9s ease-in-out infinite; }
+@keyframes bear-wave { 50% { transform: rotate(-100deg); } }

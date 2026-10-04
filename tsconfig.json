@@ -17,6 +17,8 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] },
     "types": [
       "vite/client"
     ]

@@ -1,4 +1,4 @@
-// IPC module (F0-07)
-
 export { ipc } from "./client";
+export { onEvent, errorMessage } from "./transport";
+export * from "./types";
 export type { Settings, SettingsKey } from "./settings";

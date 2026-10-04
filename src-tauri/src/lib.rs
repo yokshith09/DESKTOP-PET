@@ -6,18 +6,18 @@ mod tray;
 
 use std::sync::Arc;
 
-use loaf_core::bus::EventBus;
+use loaf_core::bus::{EventBus, Recv};
 use loaf_core::clock::{Clock, SystemClock};
 use loaf_core::db::Database;
 use loaf_core::events::Event;
 use loaf_core::settings_service::SettingsService;
-use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
 
 /// What the shell needs at shutdown.
-struct Core {
-    db: Arc<Database>,
-    bus: EventBus,
-    clock: Arc<SystemClock>,
+pub(crate) struct Core {
+    pub(crate) db: Arc<Database>,
+    pub(crate) bus: EventBus,
+    pub(crate) clock: Arc<SystemClock>,
 }
 
 /// Quit path (R0-03): announce, let the writer flush, then exit every process.
@@ -31,6 +31,25 @@ fn quit(app: &AppHandle) {
     app.exit(0);
 }
 
+/// Bus -> every webview (TRD §3). A lagging subscriber tells the UI to refetch.
+fn forward_events(app: AppHandle, bus: &EventBus) {
+    let mut events = bus.subscribe();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            match events.recv().await {
+                Recv::Event(event) => {
+                    let _ = app.emit("loaf://event", &event);
+                }
+                Recv::Resync { .. } => {
+                    let at = SystemClock::new().now_ms();
+                    let _ = app.emit("loaf://event", &Event::ResyncRequired { at });
+                }
+                Recv::Closed => break,
+            }
+        }
+    });
+}
+
 pub fn run() {
     let app = tauri::Builder::default()
         // A second launch focuses the existing window and exits (R0-01).
@@ -42,6 +61,22 @@ pub fn run() {
             ipc::setting_set,
             ipc::prefs_get,
             ipc::prefs_set,
+            ipc::notes_list,
+            ipc::note_get,
+            ipc::note_create,
+            ipc::note_update,
+            ipc::note_set_pinned,
+            ipc::note_set_archived,
+            ipc::note_delete,
+            ipc::note_restore,
+            ipc::note_discard_if_empty,
+            ipc::labels_list,
+            ipc::label_create,
+            ipc::label_rename,
+            ipc::label_delete,
+            ipc::tasks_query,
+            ipc::task_quick_add,
+            ipc::task_transition,
         ])
         .on_window_event(|window, event| {
             // Closing the main window hides it; the process keeps running (R0-03).
@@ -61,6 +96,7 @@ pub fn run() {
             let db = Arc::new(Database::open(&data_dir.join("loaf.db"), bus.clone())?);
 
             app.manage(Arc::new(SettingsService::new(db.clone(), clock.clone())));
+            forward_events(app.handle().clone(), &bus);
             app.manage(Core { db, bus, clock });
 
             tray::setup_tray(app.handle(), &tray::MenuRegistry::base(), quit)?;

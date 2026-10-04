@@ -632,7 +632,8 @@ pub enum TaskView {
 /// `priority` and `project` narrow every view. `status` and the date range apply where they make
 /// sense: `status` and a *planned*-date range in `All`, a *completion*-date range in `Completed`.
 /// Dates are inclusive local days.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
 pub struct TaskFilters {
     pub status: Option<TaskStatus>,
     pub priority: Option<Priority>,

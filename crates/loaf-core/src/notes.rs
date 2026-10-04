@@ -122,7 +122,8 @@ pub enum NoteSort {
     Color,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
 pub struct NoteInput {
     pub title: String,
     pub body: String,
@@ -131,7 +132,8 @@ pub struct NoteInput {
 }
 
 /// Fields left as `None` are not touched.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
 pub struct NotePatch {
     pub title: Option<String>,
     pub body: Option<String>,
