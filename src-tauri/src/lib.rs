@@ -2,74 +2,80 @@
 //! here; logic lives in `loaf-core` (ADR-002).
 
 mod ipc;
-mod single_instance;
 mod tray;
 
-use loaf_core::bus::EventBus;
-use loaf_core::clock::SystemClock;
-use loaf_core::db::Database;
-use loaf_core::settings_service::SettingsService;
-use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::AppHandle;
+
+use loaf_core::bus::EventBus;
+use loaf_core::clock::{Clock, SystemClock};
+use loaf_core::db::Database;
+use loaf_core::events::Event;
+use loaf_core::settings_service::SettingsService;
+use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
+
+/// What the shell needs at shutdown.
+struct Core {
+    db: Arc<Database>,
+    bus: EventBus,
+    clock: Arc<SystemClock>,
+}
+
+/// Quit path (R0-03): announce, let the writer flush, then exit every process.
+fn quit(app: &AppHandle) {
+    if let Some(core) = app.try_state::<Core>() {
+        core.bus.publish(Event::AppShuttingDown {
+            at: core.clock.now_ms(),
+        });
+        tauri::async_runtime::block_on(core.db.shutdown());
+    }
+    app.exit(0);
+}
 
 pub fn run() {
-    // TODO: Get app data directory from Tauri context
-    let data_dir = PathBuf::from(".");
-    let db_path = data_dir.join("loaf.db");
-
-    // Single-instance check (F0-08)
-    if !single_instance::acquire_lock(&data_dir).unwrap_or(false) {
-        eprintln!("Another instance of Loaf is already running");
-        return;
-    }
-
-    // Set up core services
-    let bus = Arc::new(EventBus::default());
-    let clock = Arc::new(SystemClock::new());
-
-    // TODO: Handle database opening errors gracefully
-    let db = match Database::open(&db_path, (*bus).clone()) {
-        Ok(db) => Arc::new(db),
-        Err(e) => {
-            eprintln!("Failed to open database: {e}");
-            panic!("Cannot start without database");
-        }
-    };
-
-    let settings_service = Arc::new(SettingsService::new(db, bus, clock));
-    let data_dir_clone = data_dir.clone();
-
     let app = tauri::Builder::default()
-        .manage(settings_service)
+        // A second launch focuses the existing window and exits (R0-01).
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            tray::show_main(app);
+        }))
         .invoke_handler(tauri::generate_handler![
             ipc::settings_get_all,
             ipc::setting_set,
             ipc::prefs_get,
             ipc::prefs_set,
         ])
-        .setup(move |app| {
-            // Set up tray icon and menu (F0-08)
-            tray::setup_tray(app)?;
+        .on_window_event(|window, event| {
+            // Closing the main window hides it; the process keeps running (R0-03).
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
+        .setup(|app| {
+            let data_dir = app.path().app_data_dir()?;
+            std::fs::create_dir_all(&data_dir)?;
 
-            // TODO: Set up window close behavior to hide instead of close
-            // TODO: Register tray click handlers
+            let bus = EventBus::default();
+            let clock = Arc::new(SystemClock::new());
+            let db = Arc::new(Database::open(&data_dir.join("loaf.db"), bus.clone())?);
 
+            app.manage(Arc::new(SettingsService::new(db.clone(), clock.clone())));
+            app.manage(Core { db, bus, clock });
+
+            tray::setup_tray(app.handle(), &tray::MenuRegistry::base(), quit)?;
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("failed to build app");
+        .expect("failed to build Loaf");
 
-    app.run(|_app_handle, event| {
-        match event {
-            tauri::RunEvent::ExitRequested { api, .. } => {
-                // TODO: Publish AppShuttingDown event, flush DB
-                api.prevent_exit();
-            }
-            _ => {}
+    app.run(|_app, event| {
+        // The last window closing must not end the process; only `quit` does (code is Some).
+        if let RunEvent::ExitRequested {
+            api, code: None, ..
+        } = event
+        {
+            api.prevent_exit();
         }
     });
-
-    // Clean up lock file on exit
-    let _ = single_instance::release_lock(&data_dir_clone);
 }

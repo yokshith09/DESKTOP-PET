@@ -3,7 +3,7 @@
 //! All settings live in the DB (settings table). Defaults are hardcoded here in Rust;
 //! a missing key always returns its default. Type and range validation happens on set.
 
-use crate::error::{AppError, ErrorCode, Result};
+use crate::error::{AppError, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -203,6 +203,7 @@ pub fn all_defaults() -> BTreeMap<String, Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::ErrorCode;
 
     #[test]
     fn all_defaults_exist() {

@@ -19,9 +19,4 @@ loaf-core = { path = "../crates/loaf-core" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.0", features = ["full"] }
-
-[target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["processthreadsapi", "winnt", "handleapi"] }
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
+tauri-plugin-single-instance = "2"
