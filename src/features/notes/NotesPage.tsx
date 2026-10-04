@@ -11,6 +11,7 @@ import { PageHeader } from "@/features/shell/PageHeader";
 import type { Page } from "@/features/shell/Sidebar";
 import { useNoteActions, useNotes, useSearch } from "@/hooks/useLoaf";
 import type { LabelCount, NoteSort } from "@/ipc";
+import { NoteComposer } from "./NoteComposer";
 import { NotesBoard, type NotesLayout } from "./NotesBoard";
 import { TodayStrip } from "./TodayStrip";
 
@@ -136,6 +137,7 @@ export function NotesPage({ archived, labelId, labelName, labels, onLabel, sort,
             ))}
           </div>
         )}
+        {mode === "notes" && <NoteComposer className="mb-6 max-w-2xl" onOpenEditor={onNew} />}
         <NotesBoard
           notes={notes} layout={layout} mode={mode} onNew={onNew}
           onOpen={onOpen} onPin={(id, p) => void actions.pin(id, p)}

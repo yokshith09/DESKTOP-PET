@@ -28,10 +28,10 @@ async function goTo(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
 const openNotes = (user: ReturnType<typeof userEvent.setup>) => goTo(user, /^Notes/);
 
 describe("Notes screen (against the in-memory shell)", () => {
-  it("opens on Today overview: agenda, progress, time and activity, without search or New note", async () => {
+  it("opens on Today overview: agenda, time, links and activity, without search or New note", async () => {
     render(<App />);
     expect(await screen.findByRole("region", { name: "Today’s agenda" })).toBeTruthy();
-    for (const name of ["Progress", "Done this week", "Where your time went", "Activity"]) {
+    for (const name of ["Total time today", "Apps", "Sites", "Links", "Done this week", "Activity"]) {
       expect(await screen.findByRole("region", { name })).toBeTruthy();
     }
     expect(screen.queryByRole("textbox", { name: "Search notes" })).toBeNull();
@@ -41,9 +41,11 @@ describe("Notes screen (against the in-memory shell)", () => {
   it("the Time card shows each app, expands a browser into sites, and opens the active spans", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const card = await screen.findByRole("region", { name: "Where your time went" });
+    const card = await screen.findByRole("region", { name: "Apps" });
     await user.click(await within(card).findByRole("button", { name: /Show sites in Google Chrome/ }));
     expect(await within(card).findByRole("button", { name: /^github\.com/ })).toBeTruthy();
+    const sites = await screen.findByRole("region", { name: "Sites" });
+    expect(await within(sites).findByRole("button", { name: /^github\.com/ })).toBeTruthy();
     await user.click(within(card).getByRole("button", { name: /^VS Code,/ }));
     const dialog = await screen.findByRole("dialog");
     expect(await within(dialog).findByText(/Active from/)).toBeTruthy();

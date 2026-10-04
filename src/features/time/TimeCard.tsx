@@ -99,7 +99,7 @@ export function TimeCard({ from, to, category = null, className, title = "Where 
       ) : isLoading ? (
         <div className="space-y-3 p-2" aria-hidden>{[0, 1, 2, 3].map((i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-muted" />)}</div>
       ) : rows === 0 ? (
-        <p className="px-4 py-10 text-center text-[13px] text-muted-foreground">Nothing recorded for this period yet.</p>
+        <p className="px-4 py-10 text-center text-[13px] text-muted-foreground">{sitesView ? "No sites yet. They appear once the Loaf browser extension is connected." : "Nothing recorded for this period yet."}</p>
       ) : sitesView ? (
         <ul className="space-y-0.5">
           {sites.map((d) => (

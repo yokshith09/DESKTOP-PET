@@ -1,5 +1,7 @@
 import { Bell, CheckCircle2, FilePen, FilePlus2 } from "lucide-react";
+import { LinksCard } from "@/features/links/Shortcuts";
 import { TimeCard } from "@/features/time/TimeCard";
+import { TimeHero } from "@/features/time/TimeHero";
 import { rangeBounds } from "@/features/time/range";
 import { PageHeader, Tile } from "@/features/shell/PageHeader";
 import { useDailyLog, useNotes, useReminders } from "@/hooks/useLoaf";
@@ -8,7 +10,6 @@ import { clockTime, greeting } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { AgendaCard } from "./AgendaCard";
 import { DoneThisWeek } from "./DoneThisWeek";
-import { ProgressCard } from "./ProgressCard";
 import { useAgenda } from "./TodayAgenda";
 
 interface FeedEvent { at: number; icon: React.ReactNode; text: string; tone?: "good" }
@@ -40,16 +41,17 @@ export function TodayOverviewPage() {
         description={`${dayLabel(now)} · ${agenda.open} open${flagged ? ` · ${flagged} overdue or missed` : ""}`}
         actions={<span className="text-xs text-muted-foreground">Local data · saved</span>}
       />
-      <div className="grid gap-4 lg:grid-cols-12">
-        <AgendaCard className="lg:col-span-8 lg:h-[38rem]" />
-        <div className="grid gap-4 lg:col-span-4 lg:h-[38rem] lg:grid-rows-[1.25fr_1fr]">
-          <ProgressCard log={log} className="min-h-72" />
-          <DoneThisWeek className="min-h-52" />
-        </div>
+      <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-[34rem]">
+        <AgendaCard className="lg:col-span-7" />
+        <TimeHero className="lg:col-span-5" />
       </div>
-      <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-[30rem]">
-        <TimeCard from={today.from} to={today.to} className="lg:col-span-8" />
-        <Tile className="lg:col-span-4" title="Activity" count={events.length}>
+      <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-[28rem]">
+        <TimeCard from={today.from} to={today.to} className="lg:col-span-4" title="Apps" />
+        <TimeCard from={today.from} to={today.to} className="lg:col-span-4" title="Sites" view="sites" />
+        <LinksCard className="lg:col-span-4" />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-72">
+        <Tile className="lg:col-span-8" title="Activity" count={events.length}>
           {events.length === 0 ? (
             <p className="px-2 py-8 text-center text-[13px] text-muted-foreground">Nothing yet today. Completed tasks, notes and reminders show up here.</p>
           ) : (
@@ -64,6 +66,7 @@ export function TodayOverviewPage() {
             </ol>
           )}
         </Tile>
+        <DoneThisWeek className="lg:col-span-4" />
       </div>
     </div>
   );

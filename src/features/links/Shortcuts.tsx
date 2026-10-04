@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { ExternalLink, Link2, Plus, X } from "lucide-react";
+import { Tile } from "@/features/shell/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useShortcuts } from "@/hooks/useShortcuts";
 import { parseLinks } from "@/lib/links";
 
-function AddLink({ onAdd }: { onAdd: (text: string, name?: string) => Promise<number> }) {
+export function AddLink({ onAdd }: { onAdd: (text: string, name?: string) => Promise<number> }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [name, setName] = useState("");
@@ -22,7 +23,7 @@ function AddLink({ onAdd }: { onAdd: (text: string, name?: string) => Promise<nu
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setError(""); }}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="sm"><Plus />Add link</Button>
+        <Button type="button" variant="outline" size="sm" className="h-7"><Plus />Add link</Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80">
         <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
@@ -52,31 +53,48 @@ function AddLink({ onAdd }: { onAdd: (text: string, name?: string) => Promise<nu
   );
 }
 
-/** Pasted links as chips. Click opens the page in the default browser. */
-export function Shortcuts() {
+const hostOf = (url: string) => {
+  try { return new URL(url).hostname.replace(/^www\./, "") || url; } catch { return url; }
+};
+
+/** Pasted links as their own card. Click opens the page in the default browser. */
+export function LinksCard({ className }: { className?: string }) {
   const { shortcuts, add, remove, open } = useShortcuts();
   return (
-    <div className="flex flex-wrap items-center gap-1.5" aria-label="Shortcuts">
-      <span className="mr-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Link2 className="size-3.5" />Shortcuts</span>
-      {shortcuts.map((s) => (
-        <span key={s.id} className="group inline-flex h-7 items-center overflow-hidden rounded-md border bg-muted/50 text-[12px]">
-          <button
-            type="button" onClick={() => void open(s.url)} title={s.url} aria-label={`Open ${s.label}`}
-            className="flex h-full items-center gap-1.5 px-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <span aria-hidden className="grid size-4 place-items-center rounded-[4px] bg-primary/15 text-[9px] font-bold uppercase text-primary">{s.label.charAt(0)}</span>
-            <span className="max-w-32 truncate">{s.label}</span>
-            <ExternalLink className="size-3 text-muted-foreground" />
-          </button>
-          <button
-            type="button" onClick={() => void remove(s.id)} aria-label={`Remove ${s.label}`}
-            className="grid h-full w-0 place-items-center overflow-hidden text-muted-foreground outline-none transition-[width] hover:bg-destructive/15 hover:text-destructive focus-visible:w-6 focus-visible:ring-2 focus-visible:ring-ring group-hover:w-6"
-          >
-            <X className="size-3" />
-          </button>
-        </span>
-      ))}
-      <AddLink onAdd={add} />
-    </div>
+    <Tile className={className} title="Links" count={shortcuts.length} action={<AddLink onAdd={add} />}>
+      {shortcuts.length === 0 ? (
+        <div className="grid h-full place-items-center px-4 py-8 text-center">
+          <div>
+            <span className="mx-auto mb-2 grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground"><Link2 className="size-4" /></span>
+            <p className="text-[13px] font-medium">No links yet</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Paste the pages you open every day and launch them from here.</p>
+          </div>
+        </div>
+      ) : (
+        <ul>
+          {shortcuts.map((s) => (
+            <li key={s.id} className="group flex items-center gap-1 rounded-md hover:bg-accent/50">
+              <button
+                type="button" onClick={() => void open(s.url)} title={s.url} aria-label={`Open ${s.label}`}
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-md px-1.5 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-md bg-primary/15 text-[13px] font-semibold uppercase text-primary">{s.label.charAt(0)}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-medium">{s.label}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">{hostOf(s.url)}</span>
+                </span>
+                <ExternalLink className="size-3.5 shrink-0 text-muted-foreground" />
+              </button>
+              <button
+                type="button" onClick={() => void remove(s.id)} aria-label={`Remove ${s.label}`}
+                className="grid size-7 shrink-0 place-items-center rounded text-muted-foreground opacity-0 outline-none hover:bg-destructive/15 hover:text-destructive focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
+              >
+                <X className="size-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Tile>
   );
 }

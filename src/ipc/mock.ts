@@ -191,7 +191,14 @@ export function createMock() {
   function ranges(pred: (x: Sess) => boolean, from: number, to: number): TimeRange[] {
     return sessionsFor(from, to).filter(pred).map((x) => ({ started_at: Math.max(x.start, from), ended_at: Math.min(x.end, to) })).sort((p, q) => p.started_at - q.started_at);
   }
-  const prefs = new Map<string, unknown>();
+  const prefs = new Map<string, unknown>([[
+    "ui.shortcuts",
+    [
+      { id: "s1", url: "https://github.com/yokshith09/desktop-pet", label: "Loaf repo" },
+      { id: "s2", url: "https://notion.so/loaf", label: "Notion" },
+      { id: "s3", url: "https://mail.google.com", label: "Gmail" },
+    ],
+  ]]);
 
   const handlers: Record<string, (a: Record<string, unknown>) => unknown> = {
     settings_get_all: () => settings,

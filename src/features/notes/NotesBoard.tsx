@@ -22,6 +22,10 @@ function Items({ notes, layout, ...h }: { notes: NoteSummary[]; layout: NotesLay
   if (layout === "list") {
     return (
       <div className="divide-y overflow-hidden rounded-xl border bg-card">
+        <div aria-hidden className="flex h-8 items-center gap-3 bg-muted/40 px-4 text-[11px] font-medium text-muted-foreground">
+          <span className="size-2 shrink-0" /><span className="w-56 shrink-0">Name</span><span className="flex-1">Preview</span>
+          <span className="hidden w-32 lg:block">Labels</span><span className="w-20 shrink-0 text-right">Edited</span>
+        </div>
         {notes.map((n) => <NoteRow key={n.id} note={n} {...h} />)}
       </div>
     );
