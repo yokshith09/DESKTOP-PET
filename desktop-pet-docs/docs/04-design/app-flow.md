@@ -2,7 +2,7 @@
 
 **Milestone:** D4 · **Version:** 1.2 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
 **Derives from:** PRD (D2 v1.4) · **Feeds:** UI/UX Brief (D5), Implementation Plan (D7)
-**Changes in v1.1:** §7 phase numbers reconciled with D0 Amendment D0-A1 (Integrations 5, Voice 6, Characters 7; order per ADR-015); no screen or flow changed. **v1.2:** S-50 Search and flow F-F withdrawn (D4-A2).
+**Changes in v1.1:** §7 phase numbers reconciled with D0 Amendment D0-A1 (Integrations 5, Voice 6, Characters 7; order per ADR-015); no screen or flow changed. **v1.2:** S-50 Search and flow F-F withdrawn (D4-A2). **v1.3:** search, Bin and reminders restored by the owner (backend: migration 002); screens to be amended by the frontend work.
 
 Scope: Phase 0 + Phase 1. Every screen has an ID (`S-xx`); every transition is listed. No screen may exist in code that isn't in this file.
 

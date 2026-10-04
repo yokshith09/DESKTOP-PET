@@ -12,110 +12,171 @@ use serde_json::Value;
 
 use crate::labels::Label;
 use crate::notes::Note;
+use crate::reminders::Reminder;
 use crate::tasks::{Task, TaskStatus};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(tag = "type")]
 pub enum Event {
     AppStarted {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         version: String,
     },
     AppReady {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         startup_ms: u64,
     },
     AppShuttingDown {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
     },
     SettingChanged {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         key: String,
         value: Value,
     },
     NoteCreated {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         note: Note,
     },
     NoteUpdated {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         note: Note,
     },
     NoteDeleted {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
+        at: i64,
+        id: String,
+    },
+    /// A note left the Bin.
+    NoteRestored {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
+        at: i64,
+        note: Note,
+    },
+    /// A note was permanently removed from the Bin.
+    NotePurged {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         id: String,
     },
     NotePinnedChanged {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         id: String,
         pinned: bool,
     },
     NoteArchivedChanged {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         id: String,
         archived: bool,
     },
     LabelsChanged {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         labels: Vec<Label>,
     },
     TaskCreated {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         task: Task,
     },
     TaskUpdated {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         task: Task,
     },
     TaskStatusChanged {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         id: String,
         from: TaskStatus,
         to: TaskStatus,
     },
     TaskDeferred {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         id: String,
         from_date: Option<String>,
         to_date: String,
     },
     TaskDeleted {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         id: String,
     },
+    ReminderCreated {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
+        at: i64,
+        reminder: Reminder,
+    },
+    ReminderUpdated {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
+        at: i64,
+        reminder: Reminder,
+    },
+    ReminderDeleted {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
+        at: i64,
+        id: String,
+    },
+    /// A reminder's time has come. Published exactly once per reminder (and `remind_at`).
+    ReminderDue {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
+        at: i64,
+        reminder: Reminder,
+    },
     PetVisibilityChanged {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         visible: bool,
     },
     PetMoved {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         display_id: String,
         x: i32,
         y: i32,
     },
     DataExported {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         path: String,
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         bytes: u64,
     },
     DataImported {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
+        #[cfg_attr(feature = "ts", ts(type = "Record<string, number>"))]
         counts: BTreeMap<String, u64>,
     },
     AllDataDeleted {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
     },
     DayRolledOver {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         ended_date: String,
         new_date: String,
     },
     DailyLogFrozen {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
         log_date: String,
         reconstructed: bool,
     },
     ResyncRequired {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
     },
 }
@@ -131,6 +192,8 @@ impl Event {
             | Self::NoteCreated { at, .. }
             | Self::NoteUpdated { at, .. }
             | Self::NoteDeleted { at, .. }
+            | Self::NoteRestored { at, .. }
+            | Self::NotePurged { at, .. }
             | Self::NotePinnedChanged { at, .. }
             | Self::NoteArchivedChanged { at, .. }
             | Self::LabelsChanged { at, .. }
@@ -139,6 +202,10 @@ impl Event {
             | Self::TaskStatusChanged { at, .. }
             | Self::TaskDeferred { at, .. }
             | Self::TaskDeleted { at, .. }
+            | Self::ReminderCreated { at, .. }
+            | Self::ReminderUpdated { at, .. }
+            | Self::ReminderDeleted { at, .. }
+            | Self::ReminderDue { at, .. }
             | Self::PetVisibilityChanged { at, .. }
             | Self::PetMoved { at, .. }
             | Self::DataExported { at, .. }
@@ -160,6 +227,8 @@ impl Event {
             Self::NoteCreated { .. } => "NoteCreated",
             Self::NoteUpdated { .. } => "NoteUpdated",
             Self::NoteDeleted { .. } => "NoteDeleted",
+            Self::NoteRestored { .. } => "NoteRestored",
+            Self::NotePurged { .. } => "NotePurged",
             Self::NotePinnedChanged { .. } => "NotePinnedChanged",
             Self::NoteArchivedChanged { .. } => "NoteArchivedChanged",
             Self::LabelsChanged { .. } => "LabelsChanged",
@@ -168,6 +237,10 @@ impl Event {
             Self::TaskStatusChanged { .. } => "TaskStatusChanged",
             Self::TaskDeferred { .. } => "TaskDeferred",
             Self::TaskDeleted { .. } => "TaskDeleted",
+            Self::ReminderCreated { .. } => "ReminderCreated",
+            Self::ReminderUpdated { .. } => "ReminderUpdated",
+            Self::ReminderDeleted { .. } => "ReminderDeleted",
+            Self::ReminderDue { .. } => "ReminderDue",
             Self::PetVisibilityChanged { .. } => "PetVisibilityChanged",
             Self::PetMoved { .. } => "PetMoved",
             Self::DataExported { .. } => "DataExported",
@@ -207,6 +280,14 @@ pub(crate) fn one_of_each() -> Vec<Event> {
         },
         Event::NoteDeleted {
             at: 14,
+            id: "n1".into(),
+        },
+        Event::NoteRestored {
+            at: 24,
+            note: Note::sample(),
+        },
+        Event::NotePurged {
+            at: 25,
             id: "n1".into(),
         },
         Event::NotePinnedChanged {
@@ -249,6 +330,22 @@ pub(crate) fn one_of_each() -> Vec<Event> {
         Event::TaskDeleted {
             at: 22,
             id: "t1".into(),
+        },
+        Event::ReminderCreated {
+            at: 26,
+            reminder: Reminder::sample(),
+        },
+        Event::ReminderUpdated {
+            at: 27,
+            reminder: Reminder::sample(),
+        },
+        Event::ReminderDeleted {
+            at: 28,
+            id: "r1".into(),
+        },
+        Event::ReminderDue {
+            at: 29,
+            reminder: Reminder::sample(),
         },
         Event::PetVisibilityChanged {
             at: 5,
@@ -298,6 +395,8 @@ mod tests {
         "NoteCreated",
         "NoteUpdated",
         "NoteDeleted",
+        "NoteRestored",
+        "NotePurged",
         "NotePinnedChanged",
         "NoteArchivedChanged",
         "LabelsChanged",
@@ -306,6 +405,10 @@ mod tests {
         "TaskStatusChanged",
         "TaskDeferred",
         "TaskDeleted",
+        "ReminderCreated",
+        "ReminderUpdated",
+        "ReminderDeleted",
+        "ReminderDue",
         "PetVisibilityChanged",
         "PetMoved",
         "DataExported",
@@ -325,7 +428,10 @@ mod tests {
     #[test]
     fn names_are_past_tense_apart_from_the_two_lifecycle_exceptions() {
         for name in TRD_NAMES {
-            let exception = matches!(*name, "AppReady" | "AppShuttingDown" | "ResyncRequired");
+            let exception = matches!(
+                *name,
+                "AppReady" | "AppShuttingDown" | "ResyncRequired" | "ReminderDue"
+            );
             // Regular past tense ends in "ed"; "Frozen" is the one irregular form, and
             // "RolledOver" ends in its particle.
             let past = name.ends_with("ed") || name.ends_with("Frozen") || name.ends_with("Over");
@@ -345,6 +451,19 @@ mod tests {
             assert_eq!(json["at"], event.at());
             let back: Event = serde_json::from_value(json).unwrap();
             assert_eq!(back, event);
+        }
+    }
+
+    #[test]
+    fn note_events_all_start_with_note_so_the_ui_can_invalidate_on_the_prefix() {
+        for event in one_of_each() {
+            let name = event.name();
+            if name.contains("Note") {
+                assert!(name.starts_with("Note"), "{name}");
+            }
+        }
+        for name in ["NoteDeleted", "NoteRestored", "NotePurged"] {
+            assert!(TRD_NAMES.contains(&name));
         }
     }
 

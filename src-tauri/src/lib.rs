@@ -10,14 +10,26 @@ use loaf_core::bus::{EventBus, Recv};
 use loaf_core::clock::{Clock, SystemClock};
 use loaf_core::db::Database;
 use loaf_core::events::Event;
+use loaf_core::notes;
+use loaf_core::reminders::{self, ReminderScheduler};
+use loaf_core::scheduler::{DbLastSeen, Scheduler};
 use loaf_core::settings_service::SettingsService;
 use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
+use tauri_plugin_notification::NotificationExt;
 
 /// What the shell needs at shutdown.
 pub(crate) struct Core {
     pub(crate) db: Arc<Database>,
     pub(crate) bus: EventBus,
     pub(crate) clock: Arc<SystemClock>,
+}
+
+/// Background tasks that live as long as the app. They park on the bus or a timer between
+/// events, so they cost nothing while idle. Dropping the schedulers stops them.
+#[allow(dead_code)] // held only so the tasks are not dropped
+struct Background {
+    day: Scheduler,
+    reminders: ReminderScheduler,
 }
 
 /// Quit path (R0-03): announce, let the writer flush, then exit every process.
@@ -38,6 +50,15 @@ fn forward_events(app: AppHandle, bus: &EventBus) {
         loop {
             match events.recv().await {
                 Recv::Event(event) => {
+                    if let Event::ReminderDue { reminder, .. } = &event {
+                        // Best effort: a refused or failed notification must not stop the bus.
+                        let _ = app
+                            .notification()
+                            .builder()
+                            .title(&reminder.title)
+                            .body("Reminder")
+                            .show();
+                    }
                     let _ = app.emit("loaf://event", &event);
                 }
                 Recv::Resync { .. } => {
@@ -56,6 +77,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             tray::show_main(app);
         }))
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             ipc::settings_get_all,
             ipc::setting_set,
@@ -69,7 +91,16 @@ pub fn run() {
             ipc::note_set_archived,
             ipc::note_delete,
             ipc::note_restore,
+            ipc::notes_search,
+            ipc::bin_list,
+            ipc::note_purge,
+            ipc::bin_empty,
             ipc::note_discard_if_empty,
+            ipc::reminders_list,
+            ipc::reminder_create,
+            ipc::reminder_update,
+            ipc::reminder_set_done,
+            ipc::reminder_delete,
             ipc::labels_list,
             ipc::label_create,
             ipc::label_rename,
@@ -97,7 +128,29 @@ pub fn run() {
 
             app.manage(Arc::new(SettingsService::new(db.clone(), clock.clone())));
             forward_events(app.handle().clone(), &bus);
-            app.manage(Core { db, bus, clock });
+            app.manage(Core {
+                db: db.clone(),
+                bus: bus.clone(),
+                clock: clock.clone(),
+            });
+
+            // Everything below subscribes to the bus before anything can publish to it.
+            let dyn_clock: Arc<dyn Clock> = clock.clone();
+            let background = tauri::async_runtime::block_on(async {
+                // The Bin is swept at startup and on every day rollover (no timer of its own).
+                notes::spawn_bin_janitor(db.clone(), dyn_clock.clone(), &bus);
+                let (sweep_db, sweep_clock) = (db.clone(), dyn_clock.clone());
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = notes::purge_expired(&sweep_db, &*sweep_clock).await {
+                        tracing::warn!(code = ?error.code, "couldn't clear old notes out of the Bin at startup");
+                    }
+                });
+                // Reminders missed while Loaf was closed fire once, right after start.
+                let reminders = reminders::spawn_scheduler(db.clone(), dyn_clock.clone(), &bus);
+                let day = Scheduler::spawn(dyn_clock, DbLastSeen(db.clone()), bus.clone());
+                Background { day, reminders }
+            });
+            app.manage(background);
 
             tray::setup_tray(app.handle(), &tray::MenuRegistry::base(), quit)?;
             Ok(())

@@ -50,6 +50,12 @@ jobs:
         run: cargo check --workspace --locked
       - name: Rust — tests
         run: cargo test --workspace --locked
+      - name: Generated TypeScript types are up to date (ts-rs)
+        shell: bash
+        run: |
+          pnpm gen:types
+          git diff --exit-code -- src/ipc/generated || { echo "::error::generated types are stale - run 'pnpm gen:types' and commit src/ipc/generated"; exit 1; }
+          test -z "$(git status --porcelain -- src/ipc/generated)" || { echo "::error::generated types are stale - untracked files in src/ipc/generated"; exit 1; }
       - name: Rust — coverage (reported now; the >85% floor applies once core has logic)
         run: cargo llvm-cov --workspace --locked --summary-only
 

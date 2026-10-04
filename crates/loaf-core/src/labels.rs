@@ -17,13 +17,15 @@ use crate::ids::new_id;
 pub const NAME_MAX: usize = 50;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Label {
     pub id: String,
     pub name: String,
 }
 
-/// A label with how many of the non-archived notes carry it (the sidebar count).
+/// A label with how many of the non-archived, non-Bin notes carry it (the sidebar count).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct LabelCount {
     pub label: Label,
     pub count: u32,
@@ -80,7 +82,7 @@ pub async fn list(db: &Database) -> Result<Vec<LabelCount>> {
         let mut stmt = conn.prepare(
             "SELECT l.id, l.name,
                     (SELECT COUNT(*) FROM note_labels nl JOIN notes n ON n.id = nl.note_id
-                      WHERE nl.label_id = l.id AND n.archived = 0)
+                      WHERE nl.label_id = l.id AND n.archived = 0 AND n.deleted_at IS NULL)
                FROM labels l ORDER BY l.name_folded",
         )?;
         let rows = stmt

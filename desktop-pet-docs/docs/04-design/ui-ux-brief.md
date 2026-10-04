@@ -2,7 +2,7 @@
 
 **Milestone:** D5 · **Version:** 1.2 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
 **Derives from:** PRD (D2 v1.4), App Flow (D4 v1.2) · **Feeds:** feature specs (`06-feature-definition.md`), frontend implementation
-**Changes in v1.1:** §10 pet table phase label aligned with D0 Amendment D0-A1 (characters = Phase 7); tokens and wireframes unchanged. **v1.2:** search removed (D5-A2) — sidebar box, S-50, component, empty state and two shortcuts.
+**Changes in v1.1:** §10 pet table phase label aligned with D0 Amendment D0-A1 (characters = Phase 7); tokens and wireframes unchanged. **v1.2:** search removed (D5-A2) — sidebar box, S-50, component, empty state and two shortcuts. **v1.3:** search, Bin and reminders restored by the owner (backend: migration 002); screens to be amended by the frontend work.
 
 This brief gives enough direction to build Phase 1 UI without a separate Figma pass. Visual polish (illustration, final pet art) can be iterated without changing structure.
 

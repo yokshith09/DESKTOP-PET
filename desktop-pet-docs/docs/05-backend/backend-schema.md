@@ -1,9 +1,9 @@
 # Loaf — Backend Schema
 
-**Milestone:** D6 · **Version:** 1.2 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
-**Executable source of truth:** [`migrations/001_initial.sql`](migrations/001_initial.sql) — applied against SQLite 3.45.1 inside a runner-owned transaction (STRICT tables, triggers, constraints exercised).
+**Milestone:** D6 · **Version:** 1.3 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
+**Executable source of truth:** [`migrations/001_initial.sql`](migrations/001_initial.sql) then [`migrations/002_bin_and_reminders.sql`](migrations/002_bin_and_reminders.sql) — applied against SQLite 3.45.1 inside a runner-owned transaction (STRICT tables, triggers, constraints exercised).
 **Derives from:** PRD (D2), TRD (D3), ADR-005/007
-**Changes:** v1.1 and v1.2 — see [§8 Amendments](#8-amendments).
+**Changes:** v1.1, v1.2 and v1.3 — see [§8 Amendments](#8-amendments).
 
 ---
 
@@ -29,6 +29,7 @@
 ```mermaid
 erDiagram
     notes ||--o{ note_labels : has
+    notes |o--o{ reminders : "linked from"
     labels ||--o{ note_labels : tags
     notes |o--o{ tasks : "linked from"
     tasks ||--o{ task_events : history
@@ -63,12 +64,27 @@ Values are JSON (`true`, `"dark"`, `{"x":1200,"y":800}`). Defaults live in Rust,
 | `color` | enum | `default, red, orange, yellow, green, teal, blue, purple, gray` (8 + default) |
 | `pinned`, `archived` | 0/1 | Archived + pinned allowed; pin ignored while archived |
 | `edited_at` | ms | Changes only when title/body/color/labels change, not on pin/archive |
+| `deleted_at` | ms, NULL | v1.3 (002). Non-NULL = the note is in the Bin; label links are kept. Binned notes are hidden from list, search and label counts; `purge_expired` removes rows older than 30 days. |
 
 Label names are unique **case-insensitively across the full Unicode range**, enforced by a unique index on `labels.name_folded`. `name` keeps the user's typed casing for display; `name_folded` is produced by Rust's Unicode lowercasing (`str::to_lowercase`) on every create and rename and is the only uniqueness key.
 
 [Certain] `COLLATE NOCASE` was rejected for this: SQLite's built-in NOCASE collation folds ASCII `A–Z` only, so it treats `WORK`/`work` as duplicates but accepts `ÉCLAIR` alongside `Éclair`. Verified on SQLite 3.45.1 — a `name_folded` index rejects both.
 
 Deleting a label cascades only the join rows.
+
+### 3.2a `reminders` (v1.3, migration 002)
+
+| Column | Notes |
+|--------|-------|
+| `id` | TEXT PK |
+| `title` | TEXT, 1-200 chars |
+| `remind_at` | ms (UTC). Past times are allowed and fire at once |
+| `note_id` | Optional link to a note; `ON DELETE SET NULL` |
+| `fired_at` | Set when `ReminderDue` was published (exactly once); cleared when `remind_at` changes |
+| `done_at` | Set when the person marks it done |
+| `created_at` | ms |
+
+A partial index on `remind_at` (pending = not done, not fired) serves the scheduler's "next one" and "what is due" queries. Search stays plain `LIKE` (ADR-017); no search tables were added.
 
 ### 3.3 `tasks`
 
@@ -223,3 +239,6 @@ The `meetings.transcript` comment in `001_initial.sql` and §3.6 now say Phase 6
 
 ### Amendment D6-A3 (2026-10-03) — search tables removed
 Per ADR-017, `001_initial.sql` no longer creates `search_index` (FTS5) or `search_map`, and §3.8, the ER diagram entry, the FTS size row (Phase 1 total ~26 → ~14 MB [Likely]) and the export note are updated. Schema version stays `1`: no code or user database exists, so the file is edited in place rather than superseded by a `002`. Nothing else in the schema changed; the 3 triggers, `name_folded` and the cascade rules are untouched.
+
+### Amendment D6-A4 (v1.3) — search, Bin and reminders restored by the owner
+Migration `002_bin_and_reminders.sql` adds `notes.deleted_at` (Bin, 30-day retention) and the `reminders` table. Notes search is a plain case-insensitive substring match; ADR-017 (no search tables) is unchanged. Schema version is now `2`; export format gains `reminders` and `notes.deleted_at` when export is built.

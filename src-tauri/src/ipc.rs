@@ -6,7 +6,8 @@ use std::sync::Arc;
 
 use loaf_core::error::Result;
 use loaf_core::labels::{self, Label, LabelCount};
-use loaf_core::notes::{self, Note, NoteInput, NotePatch, NoteSort, NoteSummary};
+use loaf_core::notes::{self, BinNote, Note, NoteInput, NotePatch, NoteSort, NoteSummary};
+use loaf_core::reminders::{self, Reminder, ReminderInput, ReminderPatch};
 use loaf_core::settings_service::SettingsService;
 use loaf_core::tasks::{self, Task, TaskFilters, TaskRow, TaskStatus, TaskView};
 use serde_json::Value;
@@ -92,20 +93,78 @@ pub async fn note_set_archived(id: String, archived: bool, core: State<'_, Core>
     notes::set_archived(&core.db, &*core.clock, &id, archived).await
 }
 
-/// Returns the deleted note so the UI can offer Undo via `note_restore`.
+/// Moves the note to the Bin and returns it, so the UI can offer Undo via `note_restore`.
 #[tauri::command]
 pub async fn note_delete(id: String, core: State<'_, Core>) -> Result<Note> {
     notes::delete(&core.db, &*core.clock, &id).await
 }
 
+/// Takes a note out of the Bin.
 #[tauri::command]
-pub async fn note_restore(note: Note, core: State<'_, Core>) -> Result<Note> {
-    notes::restore(&core.db, &*core.clock, note).await
+pub async fn note_restore(id: String, core: State<'_, Core>) -> Result<Note> {
+    notes::restore_from_bin(&core.db, &*core.clock, &id).await
+}
+
+#[tauri::command]
+pub async fn notes_search(
+    query: String,
+    archived: bool,
+    core: State<'_, Core>,
+) -> Result<Vec<NoteSummary>> {
+    notes::search(&core.db, &query, archived).await
+}
+
+#[tauri::command]
+pub async fn bin_list(core: State<'_, Core>) -> Result<Vec<BinNote>> {
+    notes::list_bin(&core.db).await
+}
+
+/// Deletes one binned note for good.
+#[tauri::command]
+pub async fn note_purge(id: String, core: State<'_, Core>) -> Result<()> {
+    notes::purge(&core.db, &*core.clock, &id).await
+}
+
+/// Empties the Bin; returns how many notes were removed.
+#[tauri::command]
+pub async fn bin_empty(core: State<'_, Core>) -> Result<u64> {
+    notes::empty_bin(&core.db, &*core.clock).await
 }
 
 #[tauri::command]
 pub async fn note_discard_if_empty(id: String, core: State<'_, Core>) -> Result<bool> {
     notes::discard_if_empty(&core.db, &*core.clock, &id).await
+}
+
+// ---- reminders ------------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn reminders_list(include_done: bool, core: State<'_, Core>) -> Result<Vec<Reminder>> {
+    reminders::list(&core.db, include_done).await
+}
+
+#[tauri::command]
+pub async fn reminder_create(input: ReminderInput, core: State<'_, Core>) -> Result<Reminder> {
+    reminders::create(&core.db, &*core.clock, input).await
+}
+
+#[tauri::command]
+pub async fn reminder_update(
+    id: String,
+    patch: ReminderPatch,
+    core: State<'_, Core>,
+) -> Result<Reminder> {
+    reminders::update(&core.db, &*core.clock, &id, patch).await
+}
+
+#[tauri::command]
+pub async fn reminder_set_done(id: String, done: bool, core: State<'_, Core>) -> Result<Reminder> {
+    reminders::set_done(&core.db, &*core.clock, &id, done).await
+}
+
+#[tauri::command]
+pub async fn reminder_delete(id: String, core: State<'_, Core>) -> Result<()> {
+    reminders::delete(&core.db, &*core.clock, &id).await
 }
 
 // ---- labels ---------------------------------------------------------------------------------

@@ -20,6 +20,7 @@ pub const TITLE_MAX: usize = 300;
 pub const DESCRIPTION_MAX: usize = 20_000;
 pub const PROJECT_MAX: usize = 100;
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TaskStatus {
@@ -92,6 +93,7 @@ fn action_label(from: TaskStatus, to: TaskStatus) -> &'static str {
     }
 }
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Priority {
@@ -117,6 +119,7 @@ impl Priority {
     }
 }
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {
     pub id: String,
@@ -129,10 +132,15 @@ pub struct Task {
     pub due_date: Option<NaiveDate>,
     pub note_id: Option<String>,
     pub source_action_item_id: Option<String>,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub created_at: i64,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub updated_at: i64,
+    #[cfg_attr(feature = "ts", ts(type = "number | null"))]
     pub started_at: Option<i64>,
+    #[cfg_attr(feature = "ts", ts(type = "number | null"))]
     pub completed_at: Option<i64>,
+    #[cfg_attr(feature = "ts", ts(type = "number | null"))]
     pub cancelled_at: Option<i64>,
 }
 
@@ -615,6 +623,7 @@ pub async fn delete(db: &Database, clock: &dyn Clock, id: &str) -> Result<()> {
 
 // ---- views (R1-27) -------------------------------------------------------------------------
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskView {
@@ -633,6 +642,7 @@ pub enum TaskView {
 /// sense: `status` and a *planned*-date range in `All`, a *completion*-date range in `Completed`.
 /// Dates are inclusive local days.
 #[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields = nullable))]
 #[serde(default)]
 pub struct TaskFilters {
     pub status: Option<TaskStatus>,
@@ -642,6 +652,7 @@ pub struct TaskFilters {
     pub to: Option<NaiveDate>,
 }
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskRow {
     pub task: Task,

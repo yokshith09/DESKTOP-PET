@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ErrorCode {
     Validation,
@@ -20,10 +21,12 @@ pub enum ErrorCode {
 /// Serializes to `{ "code": "...", "message": "...", "field": "..." }` (`field` omitted when absent).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
 #[error("{code:?}: {message}")]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct AppError {
     pub code: ErrorCode,
     pub message: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
     pub field: Option<String>,
 }
 

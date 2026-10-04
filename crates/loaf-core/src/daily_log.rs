@@ -271,11 +271,11 @@ fn build(conn: &Connection, date: NaiveDate, bounds: DayBounds) -> Result<(Snaps
         Ok(conn.query_row(sql, args, |r| r.get(0))?)
     };
     let notes_created = count(
-        "SELECT COUNT(*) FROM notes WHERE created_at >= ?1 AND created_at < ?2",
+        "SELECT COUNT(*) FROM notes WHERE deleted_at IS NULL AND created_at >= ?1 AND created_at < ?2",
         params![bounds.start, bounds.end],
     )?;
     let notes_edited = count(
-        "SELECT COUNT(*) FROM notes WHERE edited_at >= ?1 AND edited_at < ?2 AND created_at < ?1",
+        "SELECT COUNT(*) FROM notes WHERE deleted_at IS NULL AND edited_at >= ?1 AND edited_at < ?2 AND created_at < ?1",
         params![bounds.start, bounds.end],
     )?;
     let meetings = count(

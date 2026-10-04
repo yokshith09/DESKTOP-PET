@@ -13,6 +13,7 @@ pub mod ids;
 pub mod labels;
 pub mod logging;
 pub mod notes;
+pub mod reminders;
 pub mod scheduler;
 pub mod settings;
 pub mod settings_service;

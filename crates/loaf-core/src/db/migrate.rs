@@ -19,10 +19,20 @@ pub struct Migration {
 }
 
 /// The schema source of truth is the documented migration file; there is no second copy.
-pub static MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    sql: include_str!("../../../../desktop-pet-docs/docs/05-backend/migrations/001_initial.sql"),
-}];
+pub static MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        sql: include_str!(
+            "../../../../desktop-pet-docs/docs/05-backend/migrations/001_initial.sql"
+        ),
+    },
+    Migration {
+        version: 2,
+        sql: include_str!(
+            "../../../../desktop-pet-docs/docs/05-backend/migrations/002_bin_and_reminders.sql"
+        ),
+    },
+];
 
 /// How many pre-migration backups to keep (newest by version).
 pub const KEEP_BACKUPS: usize = 3;

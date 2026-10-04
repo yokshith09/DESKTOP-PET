@@ -4,10 +4,12 @@
 //! commit. Timestamps come from the injected [`Clock`].
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
+use crate::bus::{EventBus, Recv};
 use crate::clock::Clock;
 use crate::db::Database;
 use crate::error::{AppError, Result};
@@ -18,7 +20,14 @@ use crate::labels::Label;
 pub const TITLE_MAX: usize = 200;
 pub const BODY_MAX: usize = 100_000;
 pub const EXCERPT_CHARS: usize = 200;
+/// How long a note stays in the Bin before it is removed for good.
+pub const BIN_RETENTION_DAYS: i64 = 30;
+/// The most rows a search returns.
+pub const SEARCH_LIMIT: usize = 200;
 
+const DAY_MS: i64 = 86_400_000;
+
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum NoteColor {
@@ -65,6 +74,7 @@ impl NoteColor {
     }
 }
 
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Note {
     pub id: String,
@@ -73,7 +83,9 @@ pub struct Note {
     pub color: NoteColor,
     pub pinned: bool,
     pub archived: bool,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub created_at: i64,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub edited_at: i64,
     /// Sorted by folded name.
     pub labels: Vec<Label>,
@@ -100,6 +112,7 @@ impl Note {
 }
 
 /// What the list shows: a card, not the whole note.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NoteSummary {
     pub id: String,
@@ -108,11 +121,34 @@ pub struct NoteSummary {
     pub color: NoteColor,
     pub pinned: bool,
     pub archived: bool,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub created_at: i64,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub edited_at: i64,
     pub labels: Vec<Label>,
 }
 
+/// A card in the Bin: what the list shows, plus when the note was binned. It is permanently
+/// removed [`BIN_RETENTION_DAYS`] days after `deleted_at`.
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BinNote {
+    pub id: String,
+    pub title: String,
+    pub excerpt: String,
+    pub color: NoteColor,
+    pub pinned: bool,
+    pub archived: bool,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
+    pub created_at: i64,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
+    pub edited_at: i64,
+    pub labels: Vec<Label>,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
+    pub deleted_at: i64,
+}
+
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NoteSort {
@@ -123,6 +159,7 @@ pub enum NoteSort {
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields = nullable))]
 #[serde(default)]
 pub struct NoteInput {
     pub title: String,
@@ -133,6 +170,7 @@ pub struct NoteInput {
 
 /// Fields left as `None` are not touched.
 #[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields = nullable))]
 #[serde(default)]
 pub struct NotePatch {
     pub title: Option<String>,
@@ -233,6 +271,23 @@ fn set_labels(conn: &Connection, note_id: &str, label_ids: &[String]) -> Result<
     Ok(())
 }
 
+/// Refuse to change a note that is in the Bin (it has to be restored first). A missing note is
+/// `NOT_FOUND`.
+fn ensure_live(conn: &Connection, id: &str) -> Result<()> {
+    let deleted_at: Option<Option<i64>> = conn
+        .query_row("SELECT deleted_at FROM notes WHERE id = ?1", [id], |r| {
+            r.get(0)
+        })
+        .optional()?;
+    match deleted_at {
+        None => Err(not_found()),
+        Some(Some(_)) => Err(AppError::not_found(
+            "That note is in the Bin. Restore it to change it.",
+        )),
+        Some(None) => Ok(()),
+    }
+}
+
 fn same_labels(a: &[Label], ids: &[String]) -> bool {
     let current: HashSet<&str> = a.iter().map(|l| l.id.as_str()).collect();
     let wanted: HashSet<&str> = ids.iter().map(String::as_str).collect();
@@ -276,6 +331,7 @@ pub async fn update(db: &Database, clock: &dyn Clock, id: &str, patch: NotePatch
     }
     let (id, now) = (id.to_owned(), clock.now_ms());
     db.write(move |tx| {
+        ensure_live(tx, &id)?;
         let current = load(tx, &id)?;
         if !differs(&current, &patch) {
             return Ok((current, vec![]));
@@ -348,6 +404,7 @@ async fn set_flag(
     }
     let (id, now) = (id.to_owned(), clock.now_ms());
     db.write(move |tx| {
+        ensure_live(tx, &id)?;
         let column = match flag {
             Flag::Pinned => "pinned",
             Flag::Archived => "archived",
@@ -377,51 +434,184 @@ async fn set_flag(
     .await
 }
 
-/// Delete a note and hand back everything needed to undo it (R1-05). The caller keeps the
-/// snapshot for five seconds; there is no trash.
+/// Move a note to the Bin (R1-05). It keeps its labels and every other field, disappears from
+/// the list, search and label counts, and can be restored until it is purged. Returns the note.
+/// Deleting a note that is already in the Bin changes nothing.
 pub async fn delete(db: &Database, clock: &dyn Clock, id: &str) -> Result<Note> {
     let (id, now) = (id.to_owned(), clock.now_ms());
     db.write(move |tx| {
-        let snapshot = load(tx, &id)?;
-        tx.execute("DELETE FROM notes WHERE id = ?1", [&id])?;
-        Ok((snapshot, vec![Event::NoteDeleted { at: now, id }]))
+        let deleted_at: Option<Option<i64>> = tx
+            .query_row("SELECT deleted_at FROM notes WHERE id = ?1", [&id], |r| {
+                r.get(0)
+            })
+            .optional()?;
+        match deleted_at {
+            None => return Err(not_found()),
+            Some(Some(_)) => return Ok((load(tx, &id)?, vec![])),
+            Some(None) => {}
+        }
+        tx.execute(
+            "UPDATE notes SET deleted_at = ?1 WHERE id = ?2",
+            params![now, id],
+        )?;
+        Ok((load(tx, &id)?, vec![Event::NoteDeleted { at: now, id }]))
     })
     .await
 }
 
-/// Undo a delete: the note comes back with its original id and timestamps. A label that was
-/// deleted in the meantime is simply not re-attached.
-pub async fn restore(db: &Database, clock: &dyn Clock, snapshot: Note) -> Result<Note> {
-    let now = clock.now_ms();
+/// Take a note out of the Bin. It comes back exactly as it was. Restoring a note that is not in
+/// the Bin changes nothing.
+pub async fn restore_from_bin(db: &Database, clock: &dyn Clock, id: &str) -> Result<Note> {
+    let (id, now) = (id.to_owned(), clock.now_ms());
     db.write(move |tx| {
-        let taken: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM notes WHERE id = ?1)", [&snapshot.id], |r| r.get(0))?;
-        if taken {
-            return Err(AppError::conflict("That note is already back."));
-        }
-        tx.execute(
-            "INSERT INTO notes (id, title, body, color, pinned, archived, created_at, edited_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![snapshot.id, snapshot.title, snapshot.body, snapshot.color.as_str(), snapshot.pinned, snapshot.archived, snapshot.created_at, snapshot.edited_at],
+        let restored = tx.execute(
+            "UPDATE notes SET deleted_at = NULL WHERE id = ?1 AND deleted_at IS NOT NULL",
+            [&id],
         )?;
-        for label in &snapshot.labels {
-            tx.execute(
-                "INSERT INTO note_labels (note_id, label_id) SELECT ?1, id FROM labels WHERE id = ?2",
-                params![snapshot.id, label.id],
-            )?;
-        }
-        let note = load(tx, &snapshot.id)?;
-        Ok((note.clone(), vec![Event::NoteCreated { at: now, note }]))
+        let note = load(tx, &id)?;
+        let events = if restored > 0 {
+            vec![Event::NoteRestored {
+                at: now,
+                note: note.clone(),
+            }]
+        } else {
+            vec![]
+        };
+        Ok((note, events))
     })
     .await
+}
+
+/// What is in the Bin, most recently deleted first.
+pub async fn list_bin(db: &Database) -> Result<Vec<BinNote>> {
+    db.read(|conn| {
+        let rows = summaries(
+            conn,
+            "WHERE n.deleted_at IS NOT NULL ORDER BY n.deleted_at DESC, n.id DESC",
+            &[],
+        )?;
+        Ok(rows
+            .into_iter()
+            .map(|(s, deleted_at)| BinNote {
+                id: s.id,
+                title: s.title,
+                excerpt: s.excerpt,
+                color: s.color,
+                pinned: s.pinned,
+                archived: s.archived,
+                created_at: s.created_at,
+                edited_at: s.edited_at,
+                labels: s.labels,
+                deleted_at: deleted_at.unwrap_or_default(),
+            })
+            .collect())
+    })
+    .await
+}
+
+/// Remove binned notes by id, in the caller's transaction. Reminders that pointed at them are
+/// unlinked by the database.
+fn purge_ids(tx: &rusqlite::Transaction, ids: Vec<String>, now: i64) -> Result<(u64, Vec<Event>)> {
+    let mut events = Vec::with_capacity(ids.len());
+    for id in ids {
+        tx.execute(
+            "DELETE FROM notes WHERE id = ?1 AND deleted_at IS NOT NULL",
+            [&id],
+        )?;
+        events.push(Event::NotePurged { at: now, id });
+    }
+    Ok((events.len() as u64, events))
+}
+
+/// Delete one binned note for good. A note that is not in the Bin is left alone (`CONFLICT`).
+pub async fn purge(db: &Database, clock: &dyn Clock, id: &str) -> Result<()> {
+    let (id, now) = (id.to_owned(), clock.now_ms());
+    db.write(move |tx| {
+        ensure_binned(tx, &id)?;
+        let (_, events) = purge_ids(tx, vec![id], now)?;
+        Ok(((), events))
+    })
+    .await
+}
+
+fn ensure_binned(conn: &Connection, id: &str) -> Result<()> {
+    let deleted_at: Option<Option<i64>> = conn
+        .query_row("SELECT deleted_at FROM notes WHERE id = ?1", [id], |r| {
+            r.get(0)
+        })
+        .optional()?;
+    match deleted_at {
+        None => Err(not_found()),
+        Some(None) => Err(AppError::conflict(
+            "Only notes in the Bin can be deleted forever.",
+        )),
+        Some(Some(_)) => Ok(()),
+    }
+}
+
+/// Empty the Bin. Returns how many notes were removed.
+pub async fn empty_bin(db: &Database, clock: &dyn Clock) -> Result<u64> {
+    let now = clock.now_ms();
+    db.write(move |tx| {
+        let ids = binned_ids(tx, None)?;
+        purge_ids(tx, ids, now)
+    })
+    .await
+}
+
+/// Remove notes that have been in the Bin for more than [`BIN_RETENTION_DAYS`] days. Returns how
+/// many were removed. Runs at startup and on every day rollover, never on a timer of its own.
+pub async fn purge_expired(db: &Database, clock: &dyn Clock) -> Result<u64> {
+    let now = clock.now_ms();
+    let cutoff = now - BIN_RETENTION_DAYS * DAY_MS;
+    db.write(move |tx| {
+        let ids = binned_ids(tx, Some(cutoff))?;
+        purge_ids(tx, ids, now)
+    })
+    .await
+}
+
+fn binned_ids(conn: &Connection, older_than: Option<i64>) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT id FROM notes WHERE deleted_at IS NOT NULL AND (?1 IS NULL OR deleted_at < ?1)",
+    )?;
+    let ids = stmt
+        .query_map([older_than], |r| r.get(0))?
+        .collect::<rusqlite::Result<Vec<String>>>()?;
+    Ok(ids)
+}
+
+/// Run [`purge_expired`] whenever the day rolls over (and after falling behind on the bus).
+/// Event-driven: it parks on the bus between days.
+pub fn spawn_bin_janitor(
+    db: Arc<Database>,
+    clock: Arc<dyn Clock>,
+    bus: &EventBus,
+) -> tokio::task::JoinHandle<()> {
+    let mut events = bus.subscribe();
+    tokio::spawn(async move {
+        loop {
+            match events.recv().await {
+                Recv::Event(Event::DayRolledOver { .. }) | Recv::Resync { .. } => {
+                    if let Err(error) = purge_expired(&db, &*clock).await {
+                        tracing::warn!(code = ?error.code, "couldn't clear old notes out of the Bin; it will be retried tomorrow");
+                    }
+                }
+                Recv::Closed => break,
+                Recv::Event(_) => {}
+            }
+        }
+    })
 }
 
 /// A note with no title and no body is discarded when its editor closes (R1-01). Returns whether
-/// anything was deleted. Labels and colour do not count as content.
+/// anything was deleted. Labels and colour do not count as content. This is a hard delete: an
+/// empty note is not worth a place in the Bin.
 pub async fn discard_if_empty(db: &Database, clock: &dyn Clock, id: &str) -> Result<bool> {
     let (id, now) = (id.to_owned(), clock.now_ms());
     db.write(move |tx| {
         let removed = tx.execute(
-            "DELETE FROM notes WHERE id = ?1 AND title = '' AND body = ''",
+            "DELETE FROM notes WHERE id = ?1 AND title = '' AND body = '' AND deleted_at IS NULL",
             [&id],
         )?;
         let events = if removed > 0 {
@@ -434,8 +624,90 @@ pub async fn discard_if_empty(db: &Database, clock: &dyn Clock, id: &str) -> Res
     .await
 }
 
+type SummaryRow = (NoteSummary, Option<i64>);
+
+/// The shared card query: `tail` is everything after `FROM notes n` (a WHERE and an ORDER BY, and
+/// optionally a LIMIT), written by this module and never from user input; user values arrive
+/// only through `args`. Labels for all the cards come from one more query. The second element of
+/// each row is `deleted_at`.
+fn summaries(
+    conn: &Connection,
+    tail: &str,
+    args: &[&dyn rusqlite::ToSql],
+) -> Result<Vec<SummaryRow>> {
+    let sql = format!(
+        "SELECT n.id, n.title, substr(n.body, 1, {EXCERPT_CHARS}), n.color, n.pinned, n.archived, n.created_at, n.edited_at, n.deleted_at
+           FROM notes n {tail}"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let mut rows = stmt
+        .query_map(args, |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, bool>(4)?,
+                r.get::<_, bool>(5)?,
+                r.get::<_, i64>(6)?,
+                r.get::<_, i64>(7)?,
+                r.get::<_, Option<i64>>(8)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?
+        .into_iter()
+        .map(
+            |(id, title, excerpt, color, pinned, archived, created_at, edited_at, deleted_at)| {
+                Ok((
+                    NoteSummary {
+                        id,
+                        title,
+                        excerpt,
+                        color: NoteColor::from_db(&color)?,
+                        pinned,
+                        archived,
+                        created_at,
+                        edited_at,
+                        labels: Vec::new(),
+                    },
+                    deleted_at,
+                ))
+            },
+        )
+        .collect::<Result<Vec<_>>>()?;
+
+    if rows.is_empty() {
+        return Ok(rows);
+    }
+    // One query for every card's labels instead of one per note.
+    let ids = serde_json::to_string(&rows.iter().map(|(s, _)| s.id.as_str()).collect::<Vec<_>>())
+        .map_err(|_| AppError::internal("Loaf couldn't prepare the notes list."))?;
+    let mut by_note: HashMap<String, Vec<Label>> = HashMap::new();
+    let mut links = conn.prepare(
+        "SELECT nl.note_id, l.id, l.name FROM note_labels nl
+           JOIN labels l ON l.id = nl.label_id
+          WHERE nl.note_id IN (SELECT value FROM json_each(?1)) ORDER BY l.name_folded",
+    )?;
+    for row in links.query_map([ids], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            Label {
+                id: r.get(1)?,
+                name: r.get(2)?,
+            },
+        ))
+    })? {
+        let (note_id, label) = row?;
+        by_note.entry(note_id).or_default().push(label);
+    }
+    for (note, _) in &mut rows {
+        note.labels = by_note.remove(&note.id).unwrap_or_default();
+    }
+    Ok(rows)
+}
+
 /// The Notes view (`archived = false`) or the Archive view. Pinned notes come first in the Notes
-/// view only; in the Archive view pinning is ignored (Schema §3.2).
+/// view only; in the Archive view pinning is ignored (Schema §3.2). Notes in the Bin never appear.
 pub async fn list(
     db: &Database,
     archived: bool,
@@ -449,41 +721,50 @@ pub async fn list(
             NoteSort::Created => "n.created_at DESC, n.id DESC",
             NoteSort::Color => "n.color ASC, n.edited_at DESC, n.id DESC",
         };
-        let sql = format!(
-            "SELECT n.id, n.title, substr(n.body, 1, {EXCERPT_CHARS}), n.color, n.pinned, n.archived, n.created_at, n.edited_at
-               FROM notes n
-              WHERE n.archived = ?1
+        // `order` is one of three constants above, never user input.
+        let tail = format!(
+            "WHERE n.archived = ?1 AND n.deleted_at IS NULL
                 AND (?2 IS NULL OR EXISTS (SELECT 1 FROM note_labels nl WHERE nl.note_id = n.id AND nl.label_id = ?2))
               ORDER BY (CASE WHEN ?1 = 0 THEN n.pinned ELSE 0 END) DESC, {order}"
         );
-        // `order` is one of three constants above, never user input.
-        let mut stmt = conn.prepare(&sql)?;
-        let mut notes = stmt
-            .query_map(params![archived, label_id], |r| {
-                Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?, r.get::<_, bool>(4)?, r.get::<_, bool>(5)?, r.get(6)?, r.get(7)?))
-            })?
-            .collect::<rusqlite::Result<Vec<_>>>()?
-            .into_iter()
-            .map(|(id, title, excerpt, color, pinned, archived, created_at, edited_at)| {
-                Ok(NoteSummary { id, title, excerpt, color: NoteColor::from_db(&color)?, pinned, archived, created_at, edited_at, labels: Vec::new() })
-            })
-            .collect::<Result<Vec<_>>>()?;
+        let rows = summaries(conn, &tail, &[&archived, &label_id])?;
+        Ok(rows.into_iter().map(|(s, _)| s).collect())
+    })
+    .await
+}
 
-        // One query for every card's labels instead of one per note.
-        let mut by_note: HashMap<String, Vec<Label>> = HashMap::new();
-        let mut links = conn.prepare(
-            "SELECT nl.note_id, l.id, l.name FROM note_labels nl
-               JOIN labels l ON l.id = nl.label_id JOIN notes n ON n.id = nl.note_id
-              WHERE n.archived = ?1 ORDER BY l.name_folded",
-        )?;
-        for row in links.query_map([archived], |r| Ok((r.get::<_, String>(0)?, Label { id: r.get(1)?, name: r.get(2)? })))? {
-            let (note_id, label) = row?;
-            by_note.entry(note_id).or_default().push(label);
+/// Escape `%`, `_` and the escape character itself so the query is matched literally.
+fn like_pattern(query: &str) -> String {
+    let mut out = String::with_capacity(query.len() + 2);
+    out.push('%');
+    for c in query.chars() {
+        if matches!(c, '%' | '_' | '\\') {
+            out.push('\\');
         }
-        for note in &mut notes {
-            note.labels = by_note.remove(&note.id).unwrap_or_default();
-        }
-        Ok(notes)
+        out.push(c);
+    }
+    out.push('%');
+    out
+}
+
+/// Plain search (ADR-017: no search tables). A note matches if its title or body contains the
+/// query, ignoring case; SQLite folds only ASCII letters, so accented capitals match themselves
+/// exactly. The Bin is excluded, `archived` picks the view, newest-edited first, at most
+/// [`SEARCH_LIMIT`] results. A blank query finds nothing.
+pub async fn search(db: &Database, query: &str, archived: bool) -> Result<Vec<NoteSummary>> {
+    let query = query.trim();
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+    let pattern = like_pattern(query);
+    db.read(move |conn| {
+        let tail = format!(
+            "WHERE n.archived = ?1 AND n.deleted_at IS NULL
+                AND (n.title LIKE ?2 ESCAPE '\\' OR n.body LIKE ?2 ESCAPE '\\')
+              ORDER BY n.edited_at DESC, n.id DESC LIMIT {SEARCH_LIMIT}"
+        );
+        let rows = summaries(conn, &tail, &[&archived, &pattern])?;
+        Ok(rows.into_iter().map(|(s, _)| s).collect())
     })
     .await
 }
@@ -516,6 +797,22 @@ mod tests {
             bus,
             db,
             clock: FakeClock::new(1_000, Tz::UTC),
+        }
+    }
+
+    impl Fixture {
+        async fn db_deleted_at(&self, id: &str) -> i64 {
+            let id = id.to_owned();
+            self.db
+                .read(move |c| {
+                    Ok(
+                        c.query_row("SELECT deleted_at FROM notes WHERE id = ?1", [id], |r| {
+                            r.get(0)
+                        })?,
+                    )
+                })
+                .await
+                .unwrap()
         }
     }
 
@@ -909,10 +1206,21 @@ mod tests {
         );
     }
 
-    // ---- delete with undo (R1-05) --------------------------------------------------------------
+    // ---- the Bin (R1-05) -----------------------------------------------------------------------
+
+    const DAY: i64 = 86_400_000;
+
+    async fn binned(f: &Fixture) -> Vec<String> {
+        list_bin(&f.db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|n| n.id)
+            .collect()
+    }
 
     #[tokio::test]
-    async fn delete_returns_a_snapshot_and_restore_brings_back_the_identical_note() {
+    async fn delete_moves_a_note_to_the_bin_and_restore_brings_back_the_identical_note() {
         let f = setup();
         let work = labels::create(&f.db, &f.clock, "work").await.unwrap();
         let note = create(
@@ -931,8 +1239,11 @@ mod tests {
         let mut sub = f.bus.subscribe();
 
         f.clock.advance_ms(2_000);
-        let snapshot = delete(&f.db, &f.clock, &note.id).await.unwrap();
-        assert_eq!(snapshot, before);
+        let deleted = delete(&f.db, &f.clock, &note.id).await.unwrap();
+        assert_eq!(
+            deleted, before,
+            "the note comes back as it was, labels included"
+        );
         assert_eq!(
             event(&mut sub).await,
             Event::NoteDeleted {
@@ -941,53 +1252,252 @@ mod tests {
             }
         );
         assert_eq!(
-            get(&f.db, &note.id).await.unwrap_err().code,
-            ErrorCode::NotFound
+            get(&f.db, &note.id).await.unwrap(),
+            before,
+            "get still works by id"
+        );
+        assert!(list(&f.db, false, None, NoteSort::default())
+            .await
+            .unwrap()
+            .is_empty());
+        let bin = list_bin(&f.db).await.unwrap();
+        assert_eq!(bin.len(), 1);
+        assert_eq!(
+            (bin[0].id.as_str(), bin[0].deleted_at),
+            (note.id.as_str(), f.clock.now_ms())
+        );
+        assert_eq!(
+            bin[0].labels,
+            vec![work.clone()],
+            "label links are kept in the Bin"
         );
 
-        let restored = restore(&f.db, &f.clock, snapshot).await.unwrap();
+        f.clock.advance_ms(1_000);
+        let restored = restore_from_bin(&f.db, &f.clock, &note.id).await.unwrap();
         assert_eq!(
             restored, before,
             "same id, timestamps, pin, colour and labels"
         );
-        assert!(matches!(event(&mut sub).await, Event::NoteCreated { .. }));
+        assert_eq!(
+            event(&mut sub).await,
+            Event::NoteRestored {
+                at: f.clock.now_ms(),
+                note: before
+            }
+        );
+        assert!(binned(&f).await.is_empty());
+        assert_eq!(
+            list(&f.db, false, None, NoteSort::default())
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[tokio::test]
-    async fn restoring_twice_is_a_conflict_not_a_duplicate() {
+    async fn binning_or_restoring_twice_changes_nothing() {
         let f = setup();
         let note = make(&f, "t", "b").await;
-        let snapshot = delete(&f.db, &f.clock, &note.id).await.unwrap();
-        restore(&f.db, &f.clock, snapshot.clone()).await.unwrap();
-        assert_eq!(
-            restore(&f.db, &f.clock, snapshot).await.unwrap_err().code,
-            ErrorCode::Conflict
+        restore_from_bin(&f.db, &f.clock, &note.id).await.unwrap();
+        delete(&f.db, &f.clock, &note.id).await.unwrap();
+        let commits = f.db.committed_transactions();
+        let mut sub = f.bus.subscribe();
+        delete(&f.db, &f.clock, &note.id).await.unwrap();
+        assert_eq!(f.db.committed_transactions(), commits + 1);
+        restore_from_bin(&f.db, &f.clock, &note.id).await.unwrap();
+        restore_from_bin(&f.db, &f.clock, &note.id).await.unwrap();
+        assert!(matches!(event(&mut sub).await, Event::NoteRestored { .. }));
+        f.bus.publish(Event::AppReady {
+            at: 0,
+            startup_ms: 0,
+        });
+        assert!(
+            matches!(event(&mut sub).await, Event::AppReady { .. }),
+            "no extra events"
         );
     }
 
     #[tokio::test]
-    async fn a_label_deleted_during_the_undo_window_is_not_reattached() {
+    async fn binned_notes_are_hidden_from_the_list_search_and_label_counts() {
         let f = setup();
-        let (keep, gone) = (
-            labels::create(&f.db, &f.clock, "keep").await.unwrap(),
-            labels::create(&f.db, &f.clock, "gone").await.unwrap(),
-        );
+        let work = labels::create(&f.db, &f.clock, "work").await.unwrap();
         let note = create(
             &f.db,
             &f.clock,
             NoteInput {
-                label_ids: vec![keep.id.clone(), gone.id.clone()],
-                ..input("t", "")
+                label_ids: vec![work.id.clone()],
+                ..input("findable", "")
             },
         )
         .await
         .unwrap();
-        let snapshot = delete(&f.db, &f.clock, &note.id).await.unwrap();
-        labels::delete(&f.db, &f.clock, &gone.id).await.unwrap();
+        assert_eq!(labels::list(&f.db).await.unwrap()[0].count, 1);
+        delete(&f.db, &f.clock, &note.id).await.unwrap();
+        assert_eq!(labels::list(&f.db).await.unwrap()[0].count, 0);
+        assert!(list(&f.db, false, Some(&work.id), NoteSort::default())
+            .await
+            .unwrap()
+            .is_empty());
+        assert!(search(&f.db, "findable", false).await.unwrap().is_empty());
+        restore_from_bin(&f.db, &f.clock, &note.id).await.unwrap();
+        assert_eq!(labels::list(&f.db,).await.unwrap()[0].count, 1);
+        assert_eq!(search(&f.db, "findable", false).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_binned_note_cannot_be_edited_pinned_or_archived_until_restored() {
+        let f = setup();
+        let note = make(&f, "t", "b").await;
+        delete(&f.db, &f.clock, &note.id).await.unwrap();
+        let edit = update(
+            &f.db,
+            &f.clock,
+            &note.id,
+            NotePatch {
+                title: Some("x".into()),
+                ..Default::default()
+            },
+        )
+        .await;
+        assert_eq!(edit.unwrap_err().code, ErrorCode::NotFound);
         assert_eq!(
-            restore(&f.db, &f.clock, snapshot).await.unwrap().labels,
-            vec![keep]
+            set_pinned(&f.db, &f.clock, &note.id, true)
+                .await
+                .unwrap_err()
+                .code,
+            ErrorCode::NotFound
         );
+        assert_eq!(
+            set_archived(&f.db, &f.clock, &note.id, true)
+                .await
+                .unwrap_err()
+                .code,
+            ErrorCode::NotFound
+        );
+    }
+
+    #[tokio::test]
+    async fn the_bin_lists_the_most_recently_deleted_first() {
+        let f = setup();
+        let (a, b, c) = (
+            make(&f, "a", "").await,
+            make(&f, "b", "").await,
+            make(&f, "c", "").await,
+        );
+        for n in [&b, &c, &a] {
+            f.clock.advance_ms(100);
+            delete(&f.db, &f.clock, &n.id).await.unwrap();
+        }
+        assert_eq!(binned(&f).await, [a.id, c.id, b.id]);
+    }
+
+    #[tokio::test]
+    async fn purge_deletes_only_binned_notes_for_good_and_says_so() {
+        let f = setup();
+        let note = make(&f, "t", "b").await;
+        assert_eq!(
+            purge(&f.db, &f.clock, &note.id).await.unwrap_err().code,
+            ErrorCode::Conflict
+        );
+        assert_eq!(
+            purge(&f.db, &f.clock, "nope").await.unwrap_err().code,
+            ErrorCode::NotFound
+        );
+        delete(&f.db, &f.clock, &note.id).await.unwrap();
+        let mut sub = f.bus.subscribe();
+        purge(&f.db, &f.clock, &note.id).await.unwrap();
+        assert_eq!(
+            event(&mut sub).await,
+            Event::NotePurged {
+                at: f.clock.now_ms(),
+                id: note.id.clone()
+            }
+        );
+        assert_eq!(
+            get(&f.db, &note.id).await.unwrap_err().code,
+            ErrorCode::NotFound
+        );
+        assert_eq!(
+            restore_from_bin(&f.db, &f.clock, &note.id)
+                .await
+                .unwrap_err()
+                .code,
+            ErrorCode::NotFound
+        );
+    }
+
+    #[tokio::test]
+    async fn emptying_the_bin_removes_every_binned_note_and_nothing_else() {
+        let f = setup();
+        let keep = make(&f, "keep", "").await;
+        for t in ["a", "b", "c"] {
+            let n = make(&f, t, "").await;
+            delete(&f.db, &f.clock, &n.id).await.unwrap();
+        }
+        let mut sub = f.bus.subscribe();
+        assert_eq!(empty_bin(&f.db, &f.clock).await.unwrap(), 3);
+        for _ in 0..3 {
+            assert!(matches!(event(&mut sub).await, Event::NotePurged { .. }));
+        }
+        assert_eq!(empty_bin(&f.db, &f.clock).await.unwrap(), 0);
+        assert!(binned(&f).await.is_empty());
+        assert!(get(&f.db, &keep.id).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn notes_binned_more_than_thirty_days_ago_are_purged_and_newer_ones_stay() {
+        let f = setup();
+        let old = make(&f, "old", "").await;
+        let edge = make(&f, "edge", "").await;
+        let recent = make(&f, "recent", "").await;
+        delete(&f.db, &f.clock, &old.id).await.unwrap(); // binned at t0
+        f.clock.advance_ms(1);
+        delete(&f.db, &f.clock, &edge.id).await.unwrap(); // binned at t0 + 1
+        f.clock.advance_ms(10 * DAY);
+        delete(&f.db, &f.clock, &recent.id).await.unwrap();
+        // 30 days after `old` was binned exactly: not yet "more than" 30 days.
+        f.clock
+            .set_now_ms(f.db_deleted_at(&old.id).await + BIN_RETENTION_DAYS * DAY);
+        assert_eq!(purge_expired(&f.db, &f.clock).await.unwrap(), 0);
+        f.clock.advance_ms(1);
+        let mut sub = f.bus.subscribe();
+        assert_eq!(purge_expired(&f.db, &f.clock).await.unwrap(), 1);
+        assert!(matches!(event(&mut sub).await, Event::NotePurged { id, .. } if id == old.id));
+        assert_eq!(binned(&f).await.len(), 2);
+        f.clock.advance_ms(DAY);
+        assert_eq!(
+            purge_expired(&f.db, &f.clock).await.unwrap(),
+            1,
+            "edge goes next"
+        );
+        assert_eq!(
+            binned(&f).await,
+            [recent.id],
+            "the recently binned one is kept"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_day_rollover_clears_the_bin_of_expired_notes() {
+        let f = setup();
+        let note = make(&f, "old", "").await;
+        delete(&f.db, &f.clock, &note.id).await.unwrap();
+        f.clock.advance_ms((BIN_RETENTION_DAYS + 1) * DAY);
+        let mut sub = f.bus.subscribe();
+        let janitor = spawn_bin_janitor(f.db.clone(), Arc::new(f.clock.clone()), &f.bus);
+        f.bus.publish(Event::DayRolledOver {
+            at: f.clock.now_ms(),
+            ended_date: "2026-10-03".into(),
+            new_date: "2026-10-04".into(),
+        });
+        loop {
+            if matches!(event(&mut sub).await, Event::NotePurged { .. }) {
+                break;
+            }
+        }
+        assert!(binned(&f).await.is_empty());
+        janitor.abort();
     }
 
     #[tokio::test]
@@ -997,6 +1507,102 @@ mod tests {
             delete(&f.db, &f.clock, "nope").await.unwrap_err().code,
             ErrorCode::NotFound
         );
+        assert_eq!(
+            restore_from_bin(&f.db, &f.clock, "nope")
+                .await
+                .unwrap_err()
+                .code,
+            ErrorCode::NotFound
+        );
+    }
+
+    // ---- search ---------------------------------------------------------------------------------
+
+    fn names(v: &[NoteSummary]) -> Vec<&str> {
+        v.iter().map(|n| n.title.as_str()).collect()
+    }
+
+    #[tokio::test]
+    async fn search_matches_title_or_body_ignoring_case_newest_edited_first() {
+        let f = setup();
+        make(&f, "Groceries", "milk and eggs").await;
+        make(&f, "MILKSHAKE plan", "").await;
+        make(&f, "Unrelated", "nothing").await;
+        make(&f, "Third", "Whole Milk").await;
+        let found = search(&f.db, "  milk ", false).await.unwrap();
+        assert_eq!(names(&found), ["Third", "MILKSHAKE plan", "Groceries"]);
+    }
+
+    #[tokio::test]
+    async fn blank_queries_find_nothing() {
+        let f = setup();
+        make(&f, "a", "b").await;
+        for q in ["", "   ", "\t\n"] {
+            assert!(search(&f.db, q, false).await.unwrap().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn like_wildcards_in_the_query_are_matched_literally() {
+        let f = setup();
+        make(&f, "100% done", "").await;
+        make(&f, "snake_case", "").await;
+        make(&f, "back\\slash", "").await;
+        make(&f, "plain", "xyz").await;
+        assert_eq!(
+            names(&search(&f.db, "%", false).await.unwrap()),
+            ["100% done"]
+        );
+        assert_eq!(
+            names(&search(&f.db, "_", false).await.unwrap()),
+            ["snake_case"]
+        );
+        assert_eq!(
+            names(&search(&f.db, "\\", false).await.unwrap()),
+            ["back\\slash"]
+        );
+        assert!(search(&f.db, "x_z", false).await.unwrap().is_empty());
+        assert!(search(&f.db, "p%n", false).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn search_honours_archived_and_carries_labels() {
+        let f = setup();
+        let work = labels::create(&f.db, &f.clock, "work").await.unwrap();
+        let live = create(
+            &f.db,
+            &f.clock,
+            NoteInput {
+                label_ids: vec![work.id.clone()],
+                ..input("alpha live", "")
+            },
+        )
+        .await
+        .unwrap();
+        let old = make(&f, "alpha old", "").await;
+        set_archived(&f.db, &f.clock, &old.id, true).await.unwrap();
+        let in_notes = search(&f.db, "alpha", false).await.unwrap();
+        assert_eq!(names(&in_notes), ["alpha live"]);
+        assert_eq!(in_notes[0].id, live.id);
+        assert_eq!(in_notes[0].labels, vec![work]);
+        assert_eq!(
+            names(&search(&f.db, "alpha", true).await.unwrap()),
+            ["alpha old"]
+        );
+    }
+
+    #[tokio::test]
+    async fn search_returns_at_most_two_hundred_rows() {
+        let f = setup();
+        for i in 0..205 {
+            f.clock.advance_ms(1);
+            create(&f.db, &f.clock, input(&format!("match {i}"), ""))
+                .await
+                .unwrap();
+        }
+        let found = search(&f.db, "match", false).await.unwrap();
+        assert_eq!(found.len(), SEARCH_LIMIT);
+        assert_eq!(found[0].title, "match 204", "newest first");
     }
 
     #[tokio::test]

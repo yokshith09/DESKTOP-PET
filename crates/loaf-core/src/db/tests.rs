@@ -6,7 +6,7 @@ use super::migrate::{self, validate_chain, Migration, MIGRATIONS};
 use super::*;
 use crate::error::ErrorCode;
 
-const EXPECTED_TABLES: [&str; 13] = [
+const EXPECTED_TABLES: [&str; 14] = [
     "daily_logs",
     "labels",
     "meeting_action_items",
@@ -15,6 +15,7 @@ const EXPECTED_TABLES: [&str; 13] = [
     "meetings",
     "note_labels",
     "notes",
+    "reminders",
     "settings",
     "task_events",
     "task_work_updates",
@@ -41,10 +42,10 @@ fn migrated_memory() -> Connection {
 // ---- opening and PRAGMAs --------------------------------------------------------------------
 
 #[test]
-fn a_fresh_database_is_created_at_version_1_with_exactly_the_schema_tables() {
+fn a_fresh_database_is_created_at_the_latest_version_with_exactly_the_schema_tables() {
     let dir = tempfile::tempdir().unwrap();
     let conn = open_and_migrate(&dir.path().join("loaf.db")).unwrap();
-    assert_eq!(migrate::user_version(&conn).unwrap(), 1);
+    assert_eq!(migrate::user_version(&conn).unwrap(), 2);
     assert_eq!(
         tables(&conn),
         EXPECTED_TABLES,
@@ -76,7 +77,7 @@ fn reopening_an_up_to_date_database_changes_nothing_and_writes_no_backup() {
     let path = dir.path().join("loaf.db");
     drop(open_and_migrate(&path).unwrap());
     let conn = open_and_migrate(&path).unwrap();
-    assert_eq!(migrate::user_version(&conn).unwrap(), 1);
+    assert_eq!(migrate::user_version(&conn).unwrap(), 2);
     assert!(migrate::latest_backup(&path).is_none());
 }
 
@@ -120,6 +121,13 @@ const V2_ADD_COLUMN: Migration = Migration {
     sql: "ALTER TABLE notes ADD COLUMN pinned_at INTEGER;",
 };
 
+/// A database as version 1 of Loaf left it, for the migration tests.
+fn open_at_v1(path: &std::path::Path) -> Connection {
+    let mut conn = open_connection(path).unwrap();
+    migrate::migrate(&mut conn, &MIGRATIONS[..1]).unwrap();
+    conn
+}
+
 fn chain_v1_v2() -> Vec<Migration> {
     vec![
         Migration {
@@ -135,7 +143,7 @@ fn migrating_an_existing_database_backs_it_up_first_and_keeps_its_data() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("loaf.db");
     {
-        let conn = open_and_migrate(&path).unwrap();
+        let conn = open_at_v1(&path);
         conn.execute(
             "INSERT INTO notes (id, title, created_at, edited_at) VALUES ('n1', 'kept', 1, 1)",
             [],
@@ -172,7 +180,7 @@ fn a_failing_migration_leaves_the_database_exactly_as_it_was() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("loaf.db");
     {
-        let conn = open_and_migrate(&path).unwrap();
+        let conn = open_at_v1(&path);
         conn.execute(
             "INSERT INTO notes (id, title, created_at, edited_at) VALUES ('n1', 'safe', 1, 1)",
             [],
@@ -458,4 +466,40 @@ fn database_errors_shown_to_users_never_quote_sql_or_values() {
     let shown = AppError::from(driver_error);
     assert_eq!(shown.code, ErrorCode::Db);
     assert!(!shown.message.contains("secret-label") && !shown.message.contains("labels"));
+}
+
+#[test]
+fn migration_2_adds_the_bin_column_and_keeps_existing_notes_live() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("loaf.db");
+    {
+        let conn = open_at_v1(&path);
+        conn.execute(
+            "INSERT INTO notes (id, title, created_at, edited_at) VALUES ('n1', 'old note', 1, 1)",
+            [],
+        )
+        .unwrap();
+    }
+    let conn = open_and_migrate(&path).unwrap();
+    assert_eq!(migrate::user_version(&conn).unwrap(), 2);
+    let deleted: Option<i64> = conn
+        .query_row("SELECT deleted_at FROM notes WHERE id = 'n1'", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(deleted, None, "existing notes are not in the Bin");
+    assert!(migrate::latest_backup(&path).is_some(), "backed up first");
+    conn.execute(
+        "INSERT INTO reminders (id, title, remind_at, note_id, created_at) VALUES ('r1', 'x', 5, 'n1', 1)",
+        [],
+    )
+    .unwrap();
+    conn.execute("DELETE FROM notes WHERE id = 'n1'", [])
+        .unwrap();
+    let note: Option<String> = conn
+        .query_row("SELECT note_id FROM reminders WHERE id = 'r1'", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(note, None, "deleting a note unlinks its reminders");
 }
