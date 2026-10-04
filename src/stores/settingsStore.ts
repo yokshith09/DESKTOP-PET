@@ -39,7 +39,7 @@ class SettingsStore {
 
   patch(key: SettingsKey, value: unknown): void {
     if (!this.settings) return;
-    (this.settings as Record<string, unknown>)[key] = value;
+    (this.settings as unknown as Record<string, unknown>)[key] = value;
     this.notify();
   }
 
