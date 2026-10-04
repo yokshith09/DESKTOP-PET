@@ -2,6 +2,7 @@
 //! here; logic lives in `loaf-core` (ADR-002).
 
 mod ipc;
+mod tracking;
 mod tray;
 
 use std::sync::Arc;
@@ -14,6 +15,7 @@ use loaf_core::notes;
 use loaf_core::reminders::{self, ReminderScheduler};
 use loaf_core::scheduler::{DbLastSeen, Scheduler};
 use loaf_core::settings_service::SettingsService;
+use loaf_core::usage::{self, UsageService};
 use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
 use tauri_plugin_notification::NotificationExt;
 
@@ -38,6 +40,11 @@ fn quit(app: &AppHandle) {
         core.bus.publish(Event::AppShuttingDown {
             at: core.clock.now_ms(),
         });
+        // The collector closes the open session and writes it; that must land before the
+        // database writer stops.
+        if let Some(tracking) = app.try_state::<tracking::Tracking>() {
+            tauri::async_runtime::block_on(tracking.finish());
+        }
         tauri::async_runtime::block_on(core.db.shutdown());
     }
     app.exit(0);
@@ -78,6 +85,7 @@ pub fn run() {
             tray::show_main(app);
         }))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             ipc::settings_get_all,
             ipc::setting_set,
@@ -109,6 +117,16 @@ pub fn run() {
             ipc::task_quick_add,
             ipc::task_transition,
             ipc::daily_log_get,
+            ipc::usage_summary,
+            ipc::usage_app_sessions,
+            ipc::usage_domain_sessions,
+            ipc::tracking_status,
+            ipc::usage_delete,
+            ipc::usage_domains,
+            ipc::domain_set_tracked,
+            ipc::domain_set_category,
+            ipc::usage_record_domain,
+            ipc::open_url,
         ])
         .on_window_event(|window, event| {
             // Closing the main window hides it; the process keeps running (R0-03).
@@ -127,7 +145,10 @@ pub fn run() {
             let clock = Arc::new(SystemClock::new());
             let db = Arc::new(Database::open(&data_dir.join("loaf.db"), bus.clone())?);
 
-            app.manage(Arc::new(SettingsService::new(db.clone(), clock.clone())));
+            let settings = Arc::new(SettingsService::new(db.clone(), clock.clone()));
+            app.manage(settings.clone());
+            let usage_service = Arc::new(UsageService::new(db.clone(), clock.clone()));
+            app.manage(usage_service.clone());
             forward_events(app.handle().clone(), &bus);
             app.manage(Core {
                 db: db.clone(),
@@ -148,10 +169,23 @@ pub fn run() {
                 });
                 // Reminders missed while Loaf was closed fire once, right after start.
                 let reminders = reminders::spawn_scheduler(db.clone(), dyn_clock.clone(), &bus);
+                // Old usage is purged the same way: at startup and on every day rollover.
+                usage::spawn_janitor(usage_service.clone(), &bus);
+                let sweep = usage_service.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = sweep.purge_expired().await {
+                        tracing::warn!(code = ?error.code, "couldn't clear old usage data at startup");
+                    }
+                });
+                // App tracking is opt-in: this only starts the OS source if `tracking.apps` is on.
+                let tracking = tracking::start(usage_service, settings, dyn_clock.clone(), &bus)
+                    .unwrap_or_else(|_unsupported| tracking::Tracking::unsupported());
                 let day = Scheduler::spawn(dyn_clock, DbLastSeen(db.clone()), bus.clone());
-                Background { day, reminders }
+                (Background { day, reminders }, tracking)
             });
+            let (background, tracking) = background;
             app.manage(background);
+            app.manage(tracking);
 
             tray::setup_tray(app.handle(), &tray::MenuRegistry::base(), quit)?;
             Ok(())

@@ -6,8 +6,11 @@ use super::migrate::{self, validate_chain, Migration, MIGRATIONS};
 use super::*;
 use crate::error::ErrorCode;
 
-const EXPECTED_TABLES: [&str; 14] = [
+const EXPECTED_TABLES: [&str; 17] = [
+    "app_sessions",
     "daily_logs",
+    "domain_sessions",
+    "domains",
     "labels",
     "meeting_action_items",
     "meeting_decisions",
@@ -45,7 +48,7 @@ fn migrated_memory() -> Connection {
 fn a_fresh_database_is_created_at_the_latest_version_with_exactly_the_schema_tables() {
     let dir = tempfile::tempdir().unwrap();
     let conn = open_and_migrate(&dir.path().join("loaf.db")).unwrap();
-    assert_eq!(migrate::user_version(&conn).unwrap(), 2);
+    assert_eq!(migrate::user_version(&conn).unwrap(), 3);
     assert_eq!(
         tables(&conn),
         EXPECTED_TABLES,
@@ -77,7 +80,7 @@ fn reopening_an_up_to_date_database_changes_nothing_and_writes_no_backup() {
     let path = dir.path().join("loaf.db");
     drop(open_and_migrate(&path).unwrap());
     let conn = open_and_migrate(&path).unwrap();
-    assert_eq!(migrate::user_version(&conn).unwrap(), 2);
+    assert_eq!(migrate::user_version(&conn).unwrap(), 3);
     assert!(migrate::latest_backup(&path).is_none());
 }
 
@@ -481,7 +484,7 @@ fn migration_2_adds_the_bin_column_and_keeps_existing_notes_live() {
         .unwrap();
     }
     let conn = open_and_migrate(&path).unwrap();
-    assert_eq!(migrate::user_version(&conn).unwrap(), 2);
+    assert_eq!(migrate::user_version(&conn).unwrap(), 3);
     let deleted: Option<i64> = conn
         .query_row("SELECT deleted_at FROM notes WHERE id = 'n1'", [], |r| {
             r.get(0)
@@ -502,4 +505,62 @@ fn migration_2_adds_the_bin_column_and_keeps_existing_notes_live() {
         })
         .unwrap();
     assert_eq!(note, None, "deleting a note unlinks its reminders");
+}
+
+#[test]
+fn migration_3_adds_usage_tables_that_enforce_their_checks() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("loaf.db");
+    {
+        let mut conn = open_connection(&path).unwrap();
+        migrate::migrate(&mut conn, &MIGRATIONS[..2]).unwrap();
+    }
+    let conn = open_and_migrate(&path).unwrap();
+    assert_eq!(migrate::user_version(&conn).unwrap(), 3);
+    assert!(migrate::latest_backup(&path).is_some(), "backed up first");
+
+    exec(&conn, "INSERT INTO app_sessions (id, app, category, is_browser, started_at, ended_at) VALUES ('a', 'VS Code', 'Coding', 0, 1, 5)").unwrap();
+    exec(&conn, "INSERT INTO domain_sessions (id, browser, domain, started_at, ended_at) VALUES ('d', 'Firefox', 'example.com', 1, 5)").unwrap();
+    exec(
+        &conn,
+        "INSERT INTO domains (domain, first_seen, last_seen) VALUES ('example.com', 1, 5)",
+    )
+    .unwrap();
+    let (category, tracked): (String, i64) = conn
+        .query_row("SELECT category, tracked FROM domains", [], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })
+        .unwrap();
+    assert_eq!((category.as_str(), tracked), ("Other", 1), "defaults");
+
+    // A session cannot end before it starts, and the flags are strictly 0/1.
+    assert!(exec(&conn, "INSERT INTO app_sessions (id, app, category, is_browser, started_at, ended_at) VALUES ('b', 'x', 'Other', 0, 9, 1)").is_err());
+    assert!(exec(&conn, "INSERT INTO app_sessions (id, app, category, is_browser, started_at, ended_at) VALUES ('c', 'x', 'Other', 2, 1, 1)").is_err());
+    assert!(exec(&conn, "INSERT INTO domain_sessions (id, browser, domain, started_at, ended_at) VALUES ('e', 'x', 'a.com', 9, 1)").is_err());
+    assert!(exec(
+        &conn,
+        "INSERT INTO domains (domain, tracked, first_seen, last_seen) VALUES ('b.com', 3, 1, 1)"
+    )
+    .is_err());
+}
+
+#[test]
+fn usage_tables_have_no_column_that_could_hold_a_url_or_a_title() {
+    let conn = migrated_memory();
+    for table in ["app_sessions", "domain_sessions", "domains"] {
+        let mut stmt = conn
+            .prepare(&format!("SELECT name FROM pragma_table_info('{table}')"))
+            .unwrap();
+        let columns: Vec<String> = stmt
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        for column in columns {
+            assert!(
+                !["url", "path", "title", "window_title", "tab_title"].contains(&column.as_str()),
+                "{table}.{column} would store more than a domain"
+            );
+        }
+    }
 }

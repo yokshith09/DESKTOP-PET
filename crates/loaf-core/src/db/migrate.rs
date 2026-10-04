@@ -32,6 +32,12 @@ pub static MIGRATIONS: &[Migration] = &[
             "../../../../desktop-pet-docs/docs/05-backend/migrations/002_bin_and_reminders.sql"
         ),
     },
+    Migration {
+        version: 3,
+        sql: include_str!(
+            "../../../../desktop-pet-docs/docs/05-backend/migrations/003_usage_tracking.sql"
+        ),
+    },
 ];
 
 /// How many pre-migration backups to keep (newest by version).

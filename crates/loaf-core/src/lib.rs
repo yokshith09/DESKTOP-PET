@@ -11,6 +11,7 @@ pub mod error;
 pub mod events;
 pub mod ids;
 pub mod labels;
+pub mod links;
 pub mod logging;
 pub mod notes;
 pub mod reminders;
@@ -18,6 +19,8 @@ pub mod scheduler;
 pub mod settings;
 pub mod settings_service;
 pub mod tasks;
+pub mod usage;
+pub mod usage_collector;
 
 /// The version of the core, taken from the workspace package version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

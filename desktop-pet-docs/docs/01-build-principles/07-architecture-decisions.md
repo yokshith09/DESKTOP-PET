@@ -90,6 +90,8 @@ Each decision records **what we chose, why, what we rejected, and what it costs*
 | CI status (Phase 5.1) | A desktop app cannot receive GitHub webhooks without a public endpoint | Only while a build is known to be running; exponential backoff 15 s → 5 min; stop when finished |
 | MCP integration refresh (Phase 5) | Remote services may not push to a local client | User-configurable interval, default ≥15 min, paused when idle or on battery |
 
+| Idle detection (Windows, ADR-019) | No OS event for "no input for N minutes" | One 60 s look at `GetLastInputInfo`, only while tracking is on and an app is in front |
+
 Any new exception requires a new ADR.
 
 ## ADR-010: Browser bridge via Native Messaging
@@ -193,6 +195,28 @@ Any new exception requires a new ADR.
 **Cost / Risk:** [Guessing] CI runners are shared VMs with different WebView2/WebKit builds and no GPU, so absolute numbers may not match a user's machine. Hence the confirm band and the second, final measurement.
 
 **Verification:** The job writes a per-process table to the run summary and uploads it as an artifact; the numbers are appended to this file as an amendment.
+
+---
+
+## ADR-019: App and domain time tracking pulled forward; opt-in and domain-only
+
+**Status:** Accepted (2026-10-04, owner decision) · Amends ADR-009 (adds one polling exception) and refines the Phase 2 rules in ADR-005/010. (ADR-018 is the V-2 CI decision above.)
+
+**Decision:**
+1. **Opt-in, off by default.** Nothing is observed until the user turns on `tracking.apps`. Turning it off stops the OS source immediately and closes the open session.
+2. **Domain only.** For websites only the bare, lower-case host is stored (`domain_sessions`, `domains`). Never a full URL, path, query, window title or tab title; no column exists for them and the core rejects anything that looks like a link. This answers D0's "URL or domain only by default?": domain only.
+3. **Incognito/private windows are never reported**; the browser extension must not send them (the core cannot tell). Extension and native-messaging bridge (ADR-010) are follow-ups.
+4. **Local only, with control.** A "do not track" list of apps (`tracking.exclude_apps`, case-insensitive) and of domains (untracking also deletes its history); delete a range or everything; 400-day retention, purged at startup and on day rollover (no timer).
+5. **Windows first.** The foreground app comes from `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)` on its own thread (event-driven, as ADR-009). The executable file name is recorded, never its path or window title; processes that deny access are not recorded. macOS (`NSWorkspace`) is a follow-up.
+6. **New documented polling exception (ADR-009 table):** *Idle detection.* Windows has no event for "no input for N minutes". One timer looks at `GetLastInputInfo` every 60 s, **armed only while tracking is on and a trackable app is in front**; idle threshold 5 min, and the session is ended at the time of the last input, not at the look. The same look detects sleep (a gap far longer than 60 s) and the return from idle. A second timer flushes finished sessions in one transaction 60 s after the first is waiting, armed only while something is waiting. With tracking off or nothing in front nothing is armed.
+
+**Why:** the owner wants "where my time went" in the main dashboard now; privacy rules (1-4) make it acceptable for P3 (privacy-minded) users.
+
+**Rejected:** On by default (violates the privacy promise). Storing URLs or titles "for later" (cannot be un-collected). Polling the foreground window (CPU and battery cost; ADR-009). Per-input hooks for idle (a keylogger-shaped API for one number).
+
+**Cost / Risk:** [Likely] Idle by input undercounts passive use (watching a video, reading) after 5 minutes; accepted for v1. A crash loses the open session (at most 12 h clamp applies to what is kept). Elevated apps are invisible unless Loaf runs elevated.
+
+**Verification:** `usage` and `usage_collector` tests (tracker rules, batching, no timers while off); migration 003 test that no URL/title column exists; `UsageUpdated` coalesced to one per 30 s.
 
 ---
 

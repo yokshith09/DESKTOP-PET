@@ -113,7 +113,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let s = service(&dir, &EventBus::default());
         let all = s.get_all().await.unwrap();
-        assert_eq!(all.len(), 11);
+        assert_eq!(all.len(), 13);
         assert_eq!(all["general.theme"], json!("system"));
     }
 

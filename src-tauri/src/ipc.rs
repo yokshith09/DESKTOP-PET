@@ -7,13 +7,18 @@ use std::sync::Arc;
 use loaf_core::daily_log::{self, DailyLog};
 use loaf_core::error::{AppError, Result};
 use loaf_core::labels::{self, Label, LabelCount};
+use loaf_core::links;
 use loaf_core::notes::{self, BinNote, Note, NoteInput, NotePatch, NoteSort, NoteSummary};
 use loaf_core::reminders::{self, Reminder, ReminderInput, ReminderPatch};
+use loaf_core::settings::SettingsKey;
 use loaf_core::settings_service::SettingsService;
 use loaf_core::tasks::{self, Task, TaskFilters, TaskRow, TaskStatus, TaskView};
+use loaf_core::usage::{DomainSetting, TimeRange, TrackingStatus, UsageService, UsageSummary};
 use serde_json::Value;
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_opener::OpenerExt;
 
+use crate::tracking::Tracking;
 use crate::Core;
 
 // ---- settings and preferences ---------------------------------------------------------------
@@ -219,4 +224,137 @@ pub async fn daily_log_get(date: String, core: State<'_, Core>) -> Result<Option
     let day = chrono::NaiveDate::parse_from_str(&date, "%Y-%m-%d")
         .map_err(|_| AppError::validation("date", "Dates look like 2026-10-04."))?;
     daily_log::get(&core.db, &*core.clock, day).await
+}
+
+// ---- usage: "where my time went" (opt-in, local only) ----------------------------------------
+
+/// Time per app, per site and per local hour inside `[from, to)` (ms since the epoch, UTC).
+#[tauri::command]
+pub async fn usage_summary(
+    from: i64,
+    to: i64,
+    usage: State<'_, Arc<UsageService>>,
+) -> Result<UsageSummary> {
+    usage.summary(from, to).await
+}
+
+/// The exact active spans of one app (by the `app` name in `usage_summary`), clipped to the range.
+#[tauri::command]
+pub async fn usage_app_sessions(
+    app: String,
+    from: i64,
+    to: i64,
+    usage: State<'_, Arc<UsageService>>,
+) -> Result<Vec<TimeRange>> {
+    usage.app_sessions(&app, from, to).await
+}
+
+/// The exact active spans on one site, clipped to the range.
+#[tauri::command]
+pub async fn usage_domain_sessions(
+    domain: String,
+    from: i64,
+    to: i64,
+    usage: State<'_, Arc<UsageService>>,
+) -> Result<Vec<TimeRange>> {
+    usage.domain_sessions(&domain, from, to).await
+}
+
+#[tauri::command]
+pub async fn tracking_status(
+    tracking: State<'_, Tracking>,
+    settings: State<'_, Arc<SettingsService>>,
+) -> Result<TrackingStatus> {
+    let all = settings.get_all().await?;
+    let enabled = all
+        .get(SettingsKey::TrackingApps.as_str())
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    Ok(TrackingStatus {
+        supported: tracking.supported(),
+        running: tracking.is_running(),
+        enabled,
+    })
+}
+
+/// Deletes usage overlapping `[from, to)`; a missing bound is open-ended, so both missing deletes
+/// everything. Returns how many sessions were removed.
+#[tauri::command]
+pub async fn usage_delete(
+    from: Option<i64>,
+    to: Option<i64>,
+    usage: State<'_, Arc<UsageService>>,
+) -> Result<u64> {
+    match (from, to) {
+        (None, None) => usage.delete_all().await,
+        (from, to) => {
+            usage
+                .delete_range(from.unwrap_or(0), to.unwrap_or(i64::MAX))
+                .await
+        }
+    }
+}
+
+/// Every site seen, with its category and whether it is tracked.
+#[tauri::command]
+pub async fn usage_domains(usage: State<'_, Arc<UsageService>>) -> Result<Vec<DomainSetting>> {
+    usage.domains().await
+}
+
+/// "Do not track" for a site; turning it off also deletes what was recorded for it.
+#[tauri::command]
+pub async fn domain_set_tracked(
+    domain: String,
+    tracked: bool,
+    usage: State<'_, Arc<UsageService>>,
+) -> Result<()> {
+    usage.set_domain_tracked(&domain, tracked).await
+}
+
+#[tauri::command]
+pub async fn domain_set_category(
+    domain: String,
+    category: String,
+    usage: State<'_, Arc<UsageService>>,
+) -> Result<()> {
+    usage.set_domain_category(&domain, &category).await
+}
+
+/// Ingestion point for the browser extensions (PRD 4.7), via the native-messaging bridge.
+///
+/// `domain` must be a bare host name (never a URL, path or title) and **incognito/private
+/// windows are the extension's responsibility: it must never call this for them.** The core
+/// cannot tell, so it also refuses everything while `tracking.apps` is off. Returns whether the
+/// session was stored (false: too short, or the site is marked "do not track").
+#[tauri::command]
+pub async fn usage_record_domain(
+    browser: String,
+    domain: String,
+    started_at: i64,
+    ended_at: i64,
+    usage: State<'_, Arc<UsageService>>,
+    settings: State<'_, Arc<SettingsService>>,
+) -> Result<bool> {
+    let all = settings.get_all().await?;
+    let enabled = all
+        .get(SettingsKey::TrackingApps.as_str())
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if !enabled {
+        return Ok(false);
+    }
+    usage
+        .record_domain_session(&browser, &domain, started_at, ended_at)
+        .await
+}
+
+// ---- links ----------------------------------------------------------------------------------
+
+/// Opens an `http`, `https` or `mailto` link in the default app. Anything else is refused.
+#[tauri::command]
+pub async fn open_url(url: String, app: AppHandle) -> Result<()> {
+    let url = links::validate_external_url(&url)?;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|_| AppError::io("Loaf couldn't open that link."))
 }

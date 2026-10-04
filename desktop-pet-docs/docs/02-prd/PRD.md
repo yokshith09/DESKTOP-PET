@@ -2,7 +2,7 @@
 
 **Milestone:** D2 · **Version:** 1.4 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED — §9 decisions D-1…D-10 approved 2026-10-03
 **Derives from:** `docs/00-product/product-document.md` (D0 v1.4), `docs/01-build-principles/` (D1)
-**Changes in v1.1:** §9 approved and locked; §8 phase numbering reconciled with D0. **v1.2:** §8 reordered to the owner's phase order (D0-A2, ADR-015). **v1.3:** CI split out to Phase 5.1 (D2-A3, ADR-016). **v1.4:** global search removed (D2-A4, ADR-017). See §12.
+**Changes in v1.1:** §9 approved and locked; §8 phase numbering reconciled with D0. **v1.2:** §8 reordered to the owner's phase order (D0-A2, ADR-015). **v1.3:** CI split out to Phase 5.1 (D2-A3, ADR-016). **v1.4:** global search removed (D2-A4, ADR-017). See §12. **Owner amendment v1.4 (2026-10-04):** Phase-2 app/domain time tracking is pulled forward into the main dashboard as **opt-in (default off, `tracking.apps`), domain-only (no URLs, paths or titles), incognito excluded (extension side), local only, with delete controls** (migration 003, ADR-019). R1-46 and R1-84 are superseded for tracking; D-2 is moot; D-9 is amended: home is **"Today overview"**, combining Today and Dashboard. ADR-017 (no search) is reversed for plain notes search (case-insensitive substring, still no index). Reminders, the Bin (30 days) and calendar events (Phase 5, via MCP) are noted as owner additions. Windows collector first; macOS and the browser extensions follow.
 
 This PRD turns the Product Document into **testable requirements**. Phase 0 and Phase 1 (the first release) are specified to feature level. Phases 2–7 are specified to capability level and get their own PRD addendum before their build starts (Principle 4: one phase at a time).
 
@@ -137,7 +137,7 @@ Requirement IDs map 1:1 to feature specs (`F1-xx`) in the Implementation Plan.
 | R1-43 | Missed days | If Loaf was not running on some days, logs for those days are reconstructed from task history on next launch; days with no task/note/meeting activity get no log |
 | R1-44 | History | Calendar/list of past logs; open any day; compare with previous day (deltas on stats) |
 | R1-45 | Export day | Export a single day's log as Markdown |
-| R1-46 | Activity sections | Work sessions / app time / browser time **hidden** until Phase 2 provides data |
+| R1-46 | Activity sections | ~~Hidden until Phase 2~~ **Superseded for tracking (v1.4):** shown once the user opts in; hidden while tracking is off |
 
 ### 6.5 Search — ❌ REMOVED (D2-A4)
 
@@ -175,7 +175,7 @@ Content stays reachable through the sidebar views, the label filter (R1-09), the
 | R1-81 | Global shortcuts (OS-wide) | New note, New task (quick add popup), Show/hide pet — all user-rebindable; conflicts detected |
 | R1-82 | In-app shortcuts | See UI/UX Brief §8 keyboard map |
 | R1-83 | Platform conventions | `Ctrl` on Windows ↔ `Cmd` on macOS everywhere |
-| R1-84 | Not in v1 settings | Tracking (Phase 2), notifications (Phase 3), encryption, language — hidden, not disabled-greyed |
+| R1-84 | Not in v1 settings | ~~Tracking (Phase 2)~~ **tracking is now a setting (v1.4, off by default)**; notifications (Phase 3), encryption, language — hidden, not disabled-greyed |
 
 ## 7. Non-Functional Requirements
 
@@ -212,14 +212,14 @@ These resolve gaps or contradictions in D0. Each was a [Likely]-quality judgment
 | ID | Gap in D0 | Decision | Reason |
 |----|-----------|----------|--------|
 | D-1 | Log is "immutable" yet "view today's log" | Today = live view; snapshot frozen at rollover | Both requirements hold without contradiction |
-| D-2 | Log includes work sessions/browser time, but tracking ships in Phase 2 | Hide activity sections until Phase 2 | Showing empty sections looks broken |
+| D-2 | Log includes work sessions/browser time, but tracking ships in Phase 2 | ~~Hide activity sections until Phase 2~~ Superseded (v1.4): opt-in tracking | Showing empty sections looks broken |
 | D-3 | D0 says "cancel without deletion" but no delete for tasks | Allow delete only from COMPLETED/CANCELLED | Junk/mistaken tasks must be removable; active work can't be lost by accident |
 | D-4 | Can PLANNED go straight to COMPLETED? | Yes | Matches real behavior for small tasks |
 | D-5 | D0 "Rollback: restore from export" but no import feature | Import into empty workspace only | Merge-import is complex; restore is the stated need |
 | D-6 | Settings list "Encryption at rest" while D0 says not v1 | Hidden in v1 | No half features |
 | D-7 | Notes "delete permanently" with no recovery | 5-second undo, no trash | Prevents accidental loss without adding a trash system |
 | D-8 | "Matches partial words" | Prefix matching, not infix | FTS5 prefix indexes meet the budget; infix (trigram) roughly triples index size — revisit if users complain **(moot: search removed, D2-A4)** |
-| D-9 | Startup "Dashboard" in D0 §7.1 vs Phase 2 dashboard | Phase 1 home = **Today view**; Dashboard name reserved for Phase 2 analytics | Avoids two screens with one name |
+| D-9 | Startup "Dashboard" in D0 §7.1 vs Phase 2 dashboard | ~~Phase 1 home = Today view; Dashboard reserved for Phase 2~~ **Amended (v1.4): home is "Today overview"**, combining Today and Dashboard | Avoids two screens with one name |
 | D-10 | Auto-update not mentioned | Not in v1 | Would be the only network call; needs its own privacy decision |
 
 ## 10. Risks

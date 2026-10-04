@@ -162,9 +162,19 @@ Global search was withdrawn on 2026-10-03. Migration 001 creates no FTS5 table, 
 
 If search is ever reinstated it arrives as migration 00N that creates the index and backfills it in one pass from the source tables, and the discipline from ADR-014 (reindex inside the source transaction, consistency test, rebuild command) returns with it.
 
-## 4. Phase 2 Preview (migration 002 — not created yet)
+### 3.9 `app_sessions`, `domain_sessions`, `domains` (v1.4, migration 003)
 
-Defined now so Phase 1 doesn't paint us into a corner; created only when Phase 2 starts.
+| Table | Purpose | Columns |
+|-------|---------|---------|
+| `app_sessions` | One stretch in one foreground app | `id`, `app` (display name), `category`, `is_browser`, `started_at`, `ended_at` (>= started_at); index on `started_at` |
+| `domain_sessions` | One stretch on one site, from a browser extension | `id`, `browser`, `domain`, `started_at`, `ended_at`; index on `(domain, started_at)` |
+| `domains` | The user's say per site | `domain` PK, `category` (default `Other`), `tracked` (default 1), `first_seen`, `last_seen` |
+
+Rules: **domain only, never a URL, path or title** (no such column exists; `normalize_host` rejects anything else); a domain with `tracked = 0` is never written and untracking deletes its sessions; incognito is never reported (extension side); sessions under 2 s are dropped and over 12 h are clamped before storing; 400-day retention (purged at startup and on day rollover); categories are Coding, Design, Research, Communication, Notes, Entertainment, Other. All times are ms since the epoch (UTC); the local hour of day is computed with the injected clock's zone at query time. The tables are exported with the rest of the data when export is built. `browser_sessions` and `browser_tabs` from the old preview are not created.
+
+## 4. Phase 2 Preview — superseded by migration 003 (see §3.9 and Amendment D6-A5)
+
+The original preview, kept as the record. Pulled forward by the owner as `003_usage_tracking.sql` with a smaller, domain-only shape (§3.9).
 
 | Table | Purpose | Key columns |
 |-------|---------|-------------|
@@ -242,3 +252,6 @@ Per ADR-017, `001_initial.sql` no longer creates `search_index` (FTS5) or `searc
 
 ### Amendment D6-A4 (v1.3) — search, Bin and reminders restored by the owner
 Migration `002_bin_and_reminders.sql` adds `notes.deleted_at` (Bin, 30-day retention) and the `reminders` table. Notes search is a plain case-insensitive substring match; ADR-017 (no search tables) is unchanged. Schema version is now `2`; export format gains `reminders` and `notes.deleted_at` when export is built.
+
+### Amendment D6-A5 (v1.4) — usage tracking pulled forward
+Migration `003_usage_tracking.sql` adds `app_sessions`, `domain_sessions` and `domains` (§3.9), opt-in and domain-only per ADR-019. Schema version is now `3`. The settings `tracking.apps` (default false) and `tracking.exclude_apps` (default `[]`) are added; no settings table change.

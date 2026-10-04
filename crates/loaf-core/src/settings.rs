@@ -8,6 +8,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
+/// How many apps the "do not track" list can hold, and the longest name in it.
+pub const EXCLUDE_APPS_MAX: usize = 200;
+pub const EXCLUDE_APP_LEN_MAX: usize = 100;
+
 /// All settings keys, grouped by section (TRD §3.1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SettingsKey {
@@ -37,6 +41,12 @@ pub enum SettingsKey {
     #[serde(rename = "shortcuts.global_new_task")]
     ShortcutsGlobalNewTask,
 
+    // tracking (opt-in; Phase 2 pulled forward)
+    #[serde(rename = "tracking.apps")]
+    TrackingApps,
+    #[serde(rename = "tracking.exclude_apps")]
+    TrackingExcludeApps,
+
     // advanced
     #[serde(rename = "advanced.log_level")]
     AdvancedLogLevel,
@@ -55,6 +65,8 @@ impl SettingsKey {
             Self::ShortcutsGlobalOpen => "shortcuts.global_open",
             Self::ShortcutsGlobalNewNote => "shortcuts.global_new_note",
             Self::ShortcutsGlobalNewTask => "shortcuts.global_new_task",
+            Self::TrackingApps => "tracking.apps",
+            Self::TrackingExcludeApps => "tracking.exclude_apps",
             Self::AdvancedLogLevel => "advanced.log_level",
         }
     }
@@ -72,6 +84,8 @@ impl SettingsKey {
             "shortcuts.global_open" => Some(Self::ShortcutsGlobalOpen),
             "shortcuts.global_new_note" => Some(Self::ShortcutsGlobalNewNote),
             "shortcuts.global_new_task" => Some(Self::ShortcutsGlobalNewTask),
+            "tracking.apps" => Some(Self::TrackingApps),
+            "tracking.exclude_apps" => Some(Self::TrackingExcludeApps),
             "advanced.log_level" => Some(Self::AdvancedLogLevel),
             _ => None,
         }
@@ -90,6 +104,8 @@ impl SettingsKey {
             Self::ShortcutsGlobalOpen => json!(null),
             Self::ShortcutsGlobalNewNote => json!(null),
             Self::ShortcutsGlobalNewTask => json!(null),
+            Self::TrackingApps => json!(false),
+            Self::TrackingExcludeApps => json!([]),
             Self::AdvancedLogLevel => json!("info"),
         }
     }
@@ -97,7 +113,10 @@ impl SettingsKey {
     /// Validate a value for this key; returns error if invalid.
     pub fn validate(&self, value: &Value) -> Result<()> {
         match self {
-            Self::GeneralAutostart | Self::PetVisible | Self::PetAlwaysOnTop => {
+            Self::GeneralAutostart
+            | Self::PetVisible
+            | Self::PetAlwaysOnTop
+            | Self::TrackingApps => {
                 if !value.is_boolean() {
                     return Err(AppError::validation(self.as_str(), "must be a boolean"));
                 }
@@ -153,6 +172,28 @@ impl SettingsKey {
                     ));
                 }
             }
+            Self::TrackingExcludeApps => {
+                let items = value.as_array().ok_or_else(|| {
+                    AppError::validation(self.as_str(), "must be a list of app names")
+                })?;
+                if items.len() > EXCLUDE_APPS_MAX {
+                    return Err(AppError::validation(
+                        self.as_str(),
+                        format!("can hold at most {EXCLUDE_APPS_MAX} apps"),
+                    ));
+                }
+                for item in items {
+                    let name = item.as_str().ok_or_else(|| {
+                        AppError::validation(self.as_str(), "every app must be text")
+                    })?;
+                    if name.trim().is_empty() || name.chars().count() > EXCLUDE_APP_LEN_MAX {
+                        return Err(AppError::validation(
+                            self.as_str(),
+                            format!("each app name must be 1-{EXCLUDE_APP_LEN_MAX} characters"),
+                        ));
+                    }
+                }
+            }
             Self::AdvancedLogLevel => {
                 let s = value
                     .as_str()
@@ -193,6 +234,8 @@ pub fn all_defaults() -> BTreeMap<String, Value> {
         SettingsKey::ShortcutsGlobalOpen,
         SettingsKey::ShortcutsGlobalNewNote,
         SettingsKey::ShortcutsGlobalNewTask,
+        SettingsKey::TrackingApps,
+        SettingsKey::TrackingExcludeApps,
         SettingsKey::AdvancedLogLevel,
     ]
     .iter()
@@ -208,7 +251,13 @@ mod tests {
     #[test]
     fn all_defaults_exist() {
         let defaults = all_defaults();
-        assert_eq!(defaults.len(), 11);
+        assert_eq!(defaults.len(), 13);
+        assert_eq!(
+            defaults["tracking.apps"],
+            json!(false),
+            "tracking is opt-in"
+        );
+        assert_eq!(defaults["tracking.exclude_apps"], json!([]));
         assert_eq!(defaults["general.autostart"], json!(false));
         assert_eq!(defaults["general.theme"], json!("system"));
         assert_eq!(defaults["pet.opacity"], json!(100));
@@ -255,6 +304,31 @@ mod tests {
         assert!(SettingsKey::ShortcutsGlobalOpen
             .validate(&json!(123))
             .is_err());
+    }
+
+    #[test]
+    fn tracking_apps_is_a_boolean() {
+        assert!(SettingsKey::TrackingApps.validate(&json!(true)).is_ok());
+        assert!(SettingsKey::TrackingApps.validate(&json!("yes")).is_err());
+        assert!(SettingsKey::TrackingApps.validate(&json!(null)).is_err());
+    }
+
+    #[test]
+    fn exclude_apps_is_a_bounded_list_of_short_names() {
+        let k = SettingsKey::TrackingExcludeApps;
+        assert!(k.validate(&json!([])).is_ok());
+        assert!(k.validate(&json!(["KeePass.exe", "Signal"])).is_ok());
+        assert!(k.validate(&json!("KeePass.exe")).is_err());
+        assert!(k.validate(&json!([1])).is_err());
+        assert!(k.validate(&json!([""])).is_err());
+        assert!(k.validate(&json!(["   "])).is_err());
+        assert!(k.validate(&json!(["x".repeat(100)])).is_ok());
+        assert!(k.validate(&json!(["x".repeat(101)])).is_err());
+        let many: Vec<String> = (0..200).map(|i| format!("app{i}")).collect();
+        assert!(k.validate(&json!(many)).is_ok());
+        let too_many: Vec<String> = (0..201).map(|i| format!("app{i}")).collect();
+        let err = k.validate(&json!(too_many)).unwrap_err();
+        assert_eq!(err.field.as_deref(), Some("tracking.exclude_apps"));
     }
 
     #[test]

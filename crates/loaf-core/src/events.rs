@@ -179,6 +179,12 @@ pub enum Event {
         #[cfg_attr(feature = "ts", ts(type = "number"))]
         at: i64,
     },
+    /// New or removed app/domain time. Coalesced: published at most once per 30 s while
+    /// recording, and immediately after a delete. The UI refetches its usage queries.
+    UsageUpdated {
+        #[cfg_attr(feature = "ts", ts(type = "number"))]
+        at: i64,
+    },
 }
 
 impl Event {
@@ -213,7 +219,8 @@ impl Event {
             | Self::AllDataDeleted { at }
             | Self::DayRolledOver { at, .. }
             | Self::DailyLogFrozen { at, .. }
-            | Self::ResyncRequired { at } => *at,
+            | Self::ResyncRequired { at }
+            | Self::UsageUpdated { at } => *at,
         }
     }
 
@@ -249,6 +256,7 @@ impl Event {
             Self::DayRolledOver { .. } => "DayRolledOver",
             Self::DailyLogFrozen { .. } => "DailyLogFrozen",
             Self::ResyncRequired { .. } => "ResyncRequired",
+            Self::UsageUpdated { .. } => "UsageUpdated",
         }
     }
 }
@@ -378,6 +386,7 @@ pub(crate) fn one_of_each() -> Vec<Event> {
             reconstructed: true,
         },
         Event::ResyncRequired { at: 23 },
+        Event::UsageUpdated { at: 30 },
     ]
 }
 
@@ -417,6 +426,7 @@ mod tests {
         "DayRolledOver",
         "DailyLogFrozen",
         "ResyncRequired",
+        "UsageUpdated",
     ];
 
     #[test]
