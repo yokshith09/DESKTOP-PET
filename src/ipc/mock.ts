@@ -56,7 +56,7 @@ export function createMock() {
     t("t4", "Reply to Sam", null, today, null, "COMPLETED"),
   ];
   function t(id: string, title: string, priority: Task["priority"], planned: string | null, due: string | null, status: TaskStatus): Task {
-    return { id, title, description: "", status, priority, project: null, planned_date: planned, due_date: due, created_at: now(), updated_at: now(), completed_at: status === "COMPLETED" ? now() : null };
+    return { id, title, description: "", status, priority, project: null, planned_date: planned, due_date: due, note_id: null, source_action_item_id: null, created_at: now(), updated_at: now(), started_at: null, completed_at: status === "COMPLETED" ? now() : null, cancelled_at: null };
   }
 
   function summary(x: Note): NoteSummary {

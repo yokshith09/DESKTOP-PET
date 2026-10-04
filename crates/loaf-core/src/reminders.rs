@@ -428,7 +428,7 @@ mod tests {
     use chrono_tz::Tz;
 
     use super::*;
-    use crate::clock::FakeClock;
+    use crate::clock::{FakeClock, SystemClock};
     use crate::error::ErrorCode;
     use crate::notes::{self, NoteInput};
 
@@ -757,80 +757,69 @@ mod tests {
         assert_eq!(list(&f.db, true).await.unwrap()[0].note_id, None);
     }
 
-    // ---- the scheduler (paused tokio time, a clock that follows it) ------------------------------
+    // ---- the scheduler ----------------------------------------------------------------------------
+    //
+    // These use real (short) delays rather than tokio's paused time: the database runs on its own
+    // threads, and paused time jumps forward whenever the test is only waiting on one of them,
+    // which would fire reminders before the test could change them.
 
-    /// A clock that reads tokio's (paused) time, so sleeping in the scheduler and `now_ms` agree.
-    struct TokioClock {
-        start: Instant,
-        base_ms: i64,
-    }
-
-    impl TokioClock {
-        fn new(base_ms: i64) -> Arc<Self> {
-            Arc::new(Self {
-                start: Instant::now(),
-                base_ms,
-            })
-        }
-    }
-
-    impl Clock for TokioClock {
-        fn now_ms(&self) -> i64 {
-            self.base_ms + self.start.elapsed().as_millis() as i64
-        }
-        fn tz(&self) -> Tz {
-            Tz::UTC
-        }
+    fn clock() -> Arc<SystemClock> {
+        Arc::new(SystemClock::new())
     }
 
     /// Next `ReminderDue` seen by the subscriber, skipping every other event.
     async fn next_due(sub: &mut Subscriber) -> (i64, Reminder) {
-        loop {
-            if let Event::ReminderDue { at, reminder } = event(sub).await {
-                return (at, reminder);
+        let wait = async {
+            loop {
+                if let Event::ReminderDue { at, reminder } = event(sub).await {
+                    return (at, reminder);
+                }
             }
-        }
+        };
+        tokio::time::timeout(Duration::from_secs(10), wait)
+            .await
+            .expect("a reminder should have fired")
     }
 
-    #[tokio::test(start_paused = true)]
+    /// Everything the subscriber hears for `ms` more milliseconds must contain no `ReminderDue`.
+    async fn assert_no_due_for(sub: &mut Subscriber, ms: u64) {
+        let quiet = async {
+            loop {
+                if let Event::ReminderDue { .. } = event(sub).await {
+                    return;
+                }
+            }
+        };
+        let heard = tokio::time::timeout(Duration::from_millis(ms), quiet).await;
+        assert!(heard.is_err(), "a reminder fired when none should have");
+    }
+
+    #[tokio::test]
     async fn the_scheduler_sleeps_until_the_time_then_fires_exactly_once() {
         let f = setup();
-        let clock = TokioClock::new(1_000_000);
+        let clock = clock();
         let mut sub = f.bus.subscribe();
         let scheduler = spawn_scheduler(f.db.clone(), clock.clone(), &f.bus);
-        let r = create(&f.db, &*clock, input("stand up", 1_000_000 + 5_000))
-            .await
-            .unwrap();
+        let at = clock.now_ms() + 300;
+        let r = create(&f.db, &*clock, input("stand up", at)).await.unwrap();
 
-        let (at, fired) = next_due(&mut sub).await;
+        let (fired_at, fired) = next_due(&mut sub).await;
         assert_eq!(fired.id, r.id);
         assert!(
-            (1_005_000..1_005_100).contains(&at),
-            "fired at its time, not before: {at}"
+            fired_at >= at,
+            "fired at its time, not before: {fired_at} < {at}"
         );
-        assert_eq!(fired.fired_at, Some(at));
+        assert_eq!(fired.fired_at, Some(fired_at));
 
-        // Let a long while pass: nothing fires again.
-        tokio::time::sleep(Duration::from_secs(3 * 3600)).await;
-        f.bus.publish(Event::AppReady {
-            at: 0,
-            startup_ms: 0,
-        });
-        loop {
-            match event(&mut sub).await {
-                Event::ReminderDue { .. } => panic!("fired twice"),
-                Event::AppReady { .. } => break,
-                _ => {}
-            }
-        }
+        assert_no_due_for(&mut sub, 400).await;
         assert!(due(&f.db, clock.now_ms()).await.unwrap().is_empty());
         scheduler.stop();
     }
 
-    #[tokio::test(start_paused = true)]
+    #[tokio::test]
     async fn reminders_already_past_due_at_startup_fire_once() {
         let f = setup();
-        let clock = TokioClock::new(1_000_000);
+        let clock = clock();
         create(&f.db, &*clock, input("missed", 1_000))
             .await
             .unwrap();
@@ -838,67 +827,55 @@ mod tests {
         let scheduler = spawn_scheduler(f.db.clone(), clock.clone(), &f.bus);
         let (_, fired) = next_due(&mut sub).await;
         assert_eq!(fired.title, "missed");
+        scheduler.stop();
 
-        // A second start (the next launch) does not fire it again.
-        drop(scheduler);
+        // The next launch does not fire it again.
         let again = spawn_scheduler(f.db.clone(), clock.clone(), &f.bus);
-        tokio::time::sleep(Duration::from_secs(60)).await;
-        f.bus.publish(Event::AppReady {
-            at: 0,
-            startup_ms: 0,
-        });
-        loop {
-            match event(&mut sub).await {
-                Event::ReminderDue { .. } => panic!("fired twice"),
-                Event::AppReady { .. } => break,
-                _ => {}
-            }
-        }
+        assert_no_due_for(&mut sub, 300).await;
         again.stop();
     }
 
-    #[tokio::test(start_paused = true)]
+    #[tokio::test]
     async fn a_sooner_reminder_created_while_sleeping_is_not_overslept() {
         let f = setup();
-        let clock = TokioClock::new(1_000_000);
+        let clock = clock();
         let scheduler = spawn_scheduler(f.db.clone(), clock.clone(), &f.bus);
         let mut sub = f.bus.subscribe();
-        create(&f.db, &*clock, input("far", 1_000_000 + 3_600_000))
+        create(&f.db, &*clock, input("far", clock.now_ms() + 3_600_000))
             .await
             .unwrap();
-        create(&f.db, &*clock, input("soon", 1_000_000 + 2_000))
-            .await
-            .unwrap();
+        let soon = clock.now_ms() + 300;
+        create(&f.db, &*clock, input("soon", soon)).await.unwrap();
         let (at, fired) = next_due(&mut sub).await;
         assert_eq!(fired.title, "soon");
-        assert!(at < 1_000_000 + 3_000, "{at}");
-        let (at, fired) = next_due(&mut sub).await;
-        assert_eq!(fired.title, "far");
-        assert!(at >= 1_000_000 + 3_600_000, "{at}");
+        assert!((soon..soon + 2_000).contains(&at), "{at}");
+        assert_no_due_for(&mut sub, 300).await;
         scheduler.stop();
     }
 
-    #[tokio::test(start_paused = true)]
+    #[tokio::test]
     async fn moving_deleting_or_finishing_a_reminder_cancels_the_old_time() {
         let f = setup();
-        let clock = TokioClock::new(1_000_000);
+        let clock = clock();
         let scheduler = spawn_scheduler(f.db.clone(), clock.clone(), &f.bus);
         let mut sub = f.bus.subscribe();
-        let moved = create(&f.db, &*clock, input("moved", 1_000_000 + 1_000))
+        let base = clock.now_ms();
+        let moved = create(&f.db, &*clock, input("moved", base + 1_500))
             .await
             .unwrap();
-        let gone = create(&f.db, &*clock, input("gone", 1_000_000 + 1_500))
+        let gone = create(&f.db, &*clock, input("gone", base + 1_600))
             .await
             .unwrap();
-        let done = create(&f.db, &*clock, input("done", 1_000_000 + 1_600))
+        let done = create(&f.db, &*clock, input("done", base + 1_700))
             .await
             .unwrap();
+        let later = base + 2_500;
         update(
             &f.db,
             &*clock,
             &moved.id,
             ReminderPatch {
-                remind_at: Some(1_000_000 + 9_000),
+                remind_at: Some(later),
                 ..Default::default()
             },
         )
@@ -908,18 +885,19 @@ mod tests {
         set_done(&f.db, &*clock, &done.id, true).await.unwrap();
 
         let (at, fired) = next_due(&mut sub).await;
-        assert_eq!(fired.id, moved.id);
-        assert!(at >= 1_000_000 + 9_000, "{at}");
+        assert_eq!(fired.id, moved.id, "only the moved one is left to fire");
+        assert!(at >= later, "{at} < {later}");
         scheduler.stop();
     }
 
-    #[tokio::test(start_paused = true)]
+    #[tokio::test]
     async fn the_scheduler_stops_when_the_app_shuts_down() {
         let f = setup();
-        let clock = TokioClock::new(1_000_000);
-        let scheduler = spawn_scheduler(f.db.clone(), clock, &f.bus);
+        let scheduler = spawn_scheduler(f.db.clone(), clock(), &f.bus);
         f.bus.publish(Event::AppShuttingDown { at: 0 });
-        scheduler.task_finished().await;
+        tokio::time::timeout(Duration::from_secs(5), scheduler.task_finished())
+            .await
+            .expect("the scheduler ends by itself");
     }
 
     #[test]
