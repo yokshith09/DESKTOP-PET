@@ -1,6 +1,5 @@
 import { Bell, CheckCircle2, FilePen, FilePlus2 } from "lucide-react";
 import { LinksCard } from "@/features/links/Shortcuts";
-import { TimeCard } from "@/features/time/TimeCard";
 import { TimeHero } from "@/features/time/TimeHero";
 import { rangeBounds } from "@/features/time/range";
 import { PageHeader, Tile } from "@/features/shell/PageHeader";
@@ -41,17 +40,13 @@ export function TodayOverviewPage() {
         description={`${dayLabel(now)} · ${agenda.open} open${flagged ? ` · ${flagged} overdue or missed` : ""}`}
         actions={<span className="text-xs text-muted-foreground">Local data · saved</span>}
       />
-      <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-[34rem]">
-        <AgendaCard className="lg:col-span-7" />
-        <TimeHero className="lg:col-span-5" />
+      <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-[38rem]">
+        <AgendaCard className="lg:col-span-5" />
+        <TimeHero className="lg:col-span-7" />
       </div>
-      <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-[28rem]">
-        <TimeCard from={today.from} to={today.to} className="lg:col-span-4" title="Apps" />
-        <TimeCard from={today.from} to={today.to} className="lg:col-span-4" title="Sites" view="sites" />
+      <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-80">
         <LinksCard className="lg:col-span-4" />
-      </div>
-      <div className="grid gap-4 lg:grid-cols-12 lg:[&>*]:h-72">
-        <Tile className="lg:col-span-8" title="Activity" count={events.length}>
+        <Tile className="lg:col-span-5" title="Activity" count={events.length}>
           {events.length === 0 ? (
             <p className="px-2 py-8 text-center text-[13px] text-muted-foreground">Nothing yet today. Completed tasks, notes and reminders show up here.</p>
           ) : (
@@ -66,7 +61,7 @@ export function TodayOverviewPage() {
             </ol>
           )}
         </Tile>
-        <DoneThisWeek className="lg:col-span-4" />
+        <DoneThisWeek className="lg:col-span-3" />
       </div>
     </div>
   );

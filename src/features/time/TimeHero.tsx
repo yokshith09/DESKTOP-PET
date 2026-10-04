@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Globe, LayoutGrid, ShieldCheck, TrendingDown, TrendingUp } from "lucide-react";
 import { Bars } from "@/features/charts/Bars";
 import { Switch } from "@/components/ui/switch";
@@ -8,6 +9,7 @@ import { formatDuration } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { categoryStyle } from "./categories";
 import { rangeBounds } from "./range";
+import { SessionsDialog, type Detail } from "./SessionsDialog";
 
 /** Today's total screen time, large, with the day's shape and where it went by category. */
 export function TimeHero({ className }: { className?: string }) {
@@ -18,13 +20,10 @@ export function TimeHero({ className }: { className?: string }) {
   const { data: before } = useUsage(yesterday.from, yesterday.to);
   const [, setEnabled] = useSetting("tracking.apps");
   const tracking = status?.enabled ?? false;
+  const [detail, setDetail] = useState<Detail | null>(null);
 
   const total = usage?.total_seconds ?? 0;
   const delta = total - (before?.total_seconds ?? 0);
-  const byCategory = new Map<string, number>();
-  for (const a of usage?.apps ?? []) byCategory.set(a.category, (byCategory.get(a.category) ?? 0) + a.total_seconds);
-  const categories = [...byCategory.entries()].sort((a, b) => b[1] - a[1]);
-  const all = categories.reduce((n, [, v]) => n + v, 0) || 1;
   const hours = (usage?.hourly_seconds ?? Array<number>(24).fill(0)).map((v, h) => ({
     key: String(h), value: v, label: h % 6 === 0 ? String(h) : "", title: `${String(h).padStart(2, "0")}:00 · ${formatDuration(v)}`,
     active: new Date().getHours() === h,
@@ -57,28 +56,49 @@ export function TimeHero({ className }: { className?: string }) {
               </span>
             )}
           </p>
-          {categories.length > 0 && (
-            <>
-              <div className="mt-6 flex h-2.5 overflow-hidden rounded-full bg-muted" role="img" aria-label="Share of time by category">
-                {categories.map(([c, v]) => <span key={c} className={cn("h-full", categoryStyle(c).bar)} style={{ width: `${(v / all) * 100}%` }} />)}
-              </div>
-              <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
-                {categories.slice(0, 4).map(([c, v]) => (
-                  <li key={c} className="flex items-center gap-1.5">
-                    <span className={cn("size-2 rounded-full", categoryStyle(c).dot)} />
-                    <span className="text-muted-foreground">{c}</span>
-                    <span className="font-medium tabular-nums">{formatDuration(v)}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          <div className="mt-auto pt-5">
-            <p className="mb-2 text-[11px] font-medium text-muted-foreground">By hour</p>
-            <Bars bars={hours} className="h-24 gap-1" ariaLabel="Time by hour of the day" />
+          <div className="mt-5 grid min-h-0 flex-1 gap-5 sm:grid-cols-2">
+            <UsageList label="Apps" empty="No apps yet." items={(usage?.apps ?? []).map((a) => ({ key: a.app, name: a.app, category: a.category, seconds: a.total_seconds, kind: "app" as const }))} onOpen={setDetail} />
+            <UsageList label="Websites" empty="No sites yet. They appear once the Loaf browser extension is connected." items={(usage?.domains ?? []).map((d) => ({ key: d.domain, name: d.domain, category: d.category, seconds: d.total_seconds, kind: "domain" as const }))} onOpen={setDetail} />
           </div>
+          <div className="mt-4 shrink-0 border-t pt-3">
+            <Bars bars={hours} className="h-14 gap-1" ariaLabel="Time by hour of the day" />
+          </div>
+          <SessionsDialog detail={detail} from={today.from} to={today.to} onClose={() => setDetail(null)} />
         </>
       )}
     </Tile>
+  );
+}
+
+interface Item { key: string; name: string; category: string; seconds: number; kind: "app" | "domain" }
+
+/** Every app or site with its time, longest first; click for the active spans. */
+function UsageList({ label, items, empty, onOpen }: { label: string; items: Item[]; empty: string; onOpen: (d: Detail) => void }) {
+  const max = items[0]?.seconds ?? 1;
+  return (
+    <section aria-label={label} className="flex min-h-0 flex-col">
+      <h3 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">{label}<span className="tabular-nums text-muted-foreground/70">{items.length}</span></h3>
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground">{empty}</p>
+      ) : (
+        <ul className="-mx-1 min-h-0 flex-1 overflow-y-auto">
+          {items.map((it) => (
+            <li key={it.key}>
+              <button type="button" onClick={() => onOpen({ kind: it.kind, name: it.name, category: it.category })}
+                aria-label={`${it.name}, ${formatDuration(it.seconds)}. Show when you were active`}
+                className="block w-full rounded-md px-1 py-1.5 text-left outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring">
+                <span className="flex items-baseline gap-2">
+                  <span className="truncate text-[13px]">{it.name}</span>
+                  <span className="ml-auto text-[12px] font-medium tabular-nums">{formatDuration(it.seconds)}</span>
+                </span>
+                <span className="mt-1 block h-1 overflow-hidden rounded-full bg-muted">
+                  <span className={cn("block h-full rounded-full", categoryStyle(it.category).bar)} style={{ width: `${Math.max(2, (it.seconds / Math.max(1, max)) * 100)}%` }} />
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
