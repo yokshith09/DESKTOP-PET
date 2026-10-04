@@ -44,7 +44,7 @@ pub fn release_lock(app_data: &Path) -> io::Result<()> {
 /// Check if a process with the given PID exists.
 #[cfg(windows)]
 fn process_exists(pid: u32) -> bool {
-    use std::os::windows::raw::c_void as c_void;
+    use std::os::windows::raw::c_void;
     unsafe {
         let handle = winapi::um::processthreadsapi::OpenProcess(
             winapi::um::winnt::PROCESS_QUERY_LIMITED_INFORMATION,

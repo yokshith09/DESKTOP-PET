@@ -5,8 +5,7 @@ use tauri::{tray::TrayIconBuilder, App, AppHandle, Manager, Runtime};
 /// Register the tray icon.
 /// Menu items are registered via the tray icon's click handler.
 pub fn setup_tray<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
-    TrayIconBuilder::with_id("main")
-        .build(app)?;
+    TrayIconBuilder::with_id("main").build(app)?;
 
     // TODO: Wire up tray click handlers for menu items
     // TODO: Show/hide menu based on platform (Windows vs macOS)

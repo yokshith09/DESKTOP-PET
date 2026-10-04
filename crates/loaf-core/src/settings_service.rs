@@ -78,7 +78,10 @@ mod tests {
     #[test]
     fn get_all_includes_all_defaults() {
         let all = settings::all_defaults();
-        assert_eq!(all.get("general.autostart"), Some(&serde_json::json!(false)));
+        assert_eq!(
+            all.get("general.autostart"),
+            Some(&serde_json::json!(false))
+        );
         assert_eq!(all.get("pet.opacity"), Some(&serde_json::json!(100)));
         assert_eq!(all.len(), 11);
     }
@@ -86,12 +89,18 @@ mod tests {
     #[test]
     fn validates_type() {
         let err = settings::validate("general.autostart", &serde_json::json!("true"));
-        assert_eq!(err.as_ref().map(|e| e.field.as_deref()), Some(Some("general.autostart")));
+        assert_eq!(
+            err.as_ref().map(|e| e.field.as_deref()),
+            Some(Some("general.autostart"))
+        );
     }
 
     #[test]
     fn validates_range() {
         let err = settings::validate("pet.opacity", &serde_json::json!(150));
-        assert_eq!(err.as_ref().map(|e| e.field.as_deref()), Some(Some("pet.opacity")));
+        assert_eq!(
+            err.as_ref().map(|e| e.field.as_deref()),
+            Some(Some("pet.opacity"))
+        );
     }
 }

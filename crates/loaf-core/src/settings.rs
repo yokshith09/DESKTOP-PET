@@ -103,9 +103,9 @@ impl SettingsKey {
                 }
             }
             Self::GeneralTheme => {
-                let s = value.as_str().ok_or_else(|| {
-                    AppError::validation(self.as_str(), "must be a string")
-                })?;
+                let s = value
+                    .as_str()
+                    .ok_or_else(|| AppError::validation(self.as_str(), "must be a string"))?;
                 if !["light", "dark", "system"].contains(&s) {
                     return Err(AppError::validation(
                         self.as_str(),
@@ -114,25 +114,31 @@ impl SettingsKey {
                 }
             }
             Self::GeneralFontSize => {
-                let s = value.as_str().ok_or_else(|| {
-                    AppError::validation(self.as_str(), "must be a string")
-                })?;
+                let s = value
+                    .as_str()
+                    .ok_or_else(|| AppError::validation(self.as_str(), "must be a string"))?;
                 if !["S", "M", "L"].contains(&s) {
-                    return Err(AppError::validation(self.as_str(), "must be 'S', 'M', or 'L'"));
+                    return Err(AppError::validation(
+                        self.as_str(),
+                        "must be 'S', 'M', or 'L'",
+                    ));
                 }
             }
             Self::PetSize => {
-                let s = value.as_str().ok_or_else(|| {
-                    AppError::validation(self.as_str(), "must be a string")
-                })?;
+                let s = value
+                    .as_str()
+                    .ok_or_else(|| AppError::validation(self.as_str(), "must be a string"))?;
                 if !["S", "M", "L"].contains(&s) {
-                    return Err(AppError::validation(self.as_str(), "must be 'S', 'M', or 'L'"));
+                    return Err(AppError::validation(
+                        self.as_str(),
+                        "must be 'S', 'M', or 'L'",
+                    ));
                 }
             }
             Self::PetOpacity => {
-                let n = value.as_u64().ok_or_else(|| {
-                    AppError::validation(self.as_str(), "must be a number")
-                })?;
+                let n = value
+                    .as_u64()
+                    .ok_or_else(|| AppError::validation(self.as_str(), "must be a number"))?;
                 if n > 100 {
                     return Err(AppError::validation(self.as_str(), "must be 0–100"));
                 }
@@ -141,13 +147,16 @@ impl SettingsKey {
             | Self::ShortcutsGlobalNewNote
             | Self::ShortcutsGlobalNewTask => {
                 if !value.is_null() && !value.is_string() {
-                    return Err(AppError::validation(self.as_str(), "must be null or a string"));
+                    return Err(AppError::validation(
+                        self.as_str(),
+                        "must be null or a string",
+                    ));
                 }
             }
             Self::AdvancedLogLevel => {
-                let s = value.as_str().ok_or_else(|| {
-                    AppError::validation(self.as_str(), "must be a string")
-                })?;
+                let s = value
+                    .as_str()
+                    .ok_or_else(|| AppError::validation(self.as_str(), "must be a string"))?;
                 if !["trace", "debug", "info", "warn", "error"].contains(&s) {
                     return Err(AppError::validation(
                         self.as_str(),
@@ -207,7 +216,9 @@ mod tests {
     #[test]
     fn validate_boolean_fields() {
         assert!(SettingsKey::GeneralAutostart.validate(&json!(true)).is_ok());
-        assert!(SettingsKey::GeneralAutostart.validate(&json!(false)).is_ok());
+        assert!(SettingsKey::GeneralAutostart
+            .validate(&json!(false))
+            .is_ok());
         assert!(SettingsKey::GeneralAutostart
             .validate(&json!("true"))
             .is_err());

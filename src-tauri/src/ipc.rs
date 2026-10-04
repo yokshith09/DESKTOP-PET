@@ -8,7 +8,9 @@ use std::sync::Arc;
 
 /// Get all settings with defaults applied.
 #[tauri::command]
-pub fn settings_get_all(service: tauri::State<'_, Arc<SettingsService>>) -> Result<BTreeMap<String, Value>, String> {
+pub fn settings_get_all(
+    service: tauri::State<'_, Arc<SettingsService>>,
+) -> Result<BTreeMap<String, Value>, String> {
     Ok(service.get_all())
 }
 
@@ -24,7 +26,10 @@ pub fn setting_set(
 
 /// Get a user preference (like window bounds, last view).
 #[tauri::command]
-pub fn prefs_get(key: String, service: tauri::State<'_, Arc<SettingsService>>) -> Result<Option<Value>, String> {
+pub fn prefs_get(
+    key: String,
+    service: tauri::State<'_, Arc<SettingsService>>,
+) -> Result<Option<Value>, String> {
     Ok(service.get_pref(&key))
 }
 
