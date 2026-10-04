@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loaf — Notes dashboard prototype</title>
+<style>
+:root{
+  --bg:#FAF8F5;--surface:#fff;--surface-2:#F2EFEA;--border:#E4DFD7;--text:#1F1D1A;--text-2:#6B655C;
+  --accent:#C26A2B;--accent-contrast:#fff;--danger:#B3261E;--success:#2E7D32;--warning:#9A6700;
+  --n-red:#FBE4E2;--n-orange:#FCE8D5;--n-yellow:#FBF3C9;--n-green:#E1F2DE;--n-teal:#DCF1EE;--n-blue:#DDE8F8;--n-purple:#ECE2F7;
+  --shadow:0 8px 24px rgb(0 0 0/.12);--ring:0 0 0 2px var(--bg),0 0 0 4px var(--accent);
+}
+:root[data-theme=dark]{
+  --bg:#1B1A18;--surface:#242320;--surface-2:#2D2B28;--border:#3A3733;--text:#EDEAE4;--text-2:#A39D93;
+  --accent:#E08B4A;--accent-contrast:#1B1A18;--danger:#F2B8B5;--success:#81C995;--warning:#F0C674;
+  --n-red:#4A2523;--n-orange:#4A3220;--n-yellow:#46401F;--n-green:#24391F;--n-teal:#1F3A37;--n-blue:#22304A;--n-purple:#352848;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/20px -apple-system,BlinkMacSystemFont,"Segoe UI Variable","Segoe UI",Roboto,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:none;box-shadow:var(--ring);border-radius:6px}
+.app{display:grid;grid-template-columns:232px 1fr;grid-template-rows:60px 1fr;height:100vh;min-height:620px}
+/* top bar */
+.top{grid-column:2;display:flex;align-items:center;gap:16px;padding:0 24px;border-bottom:1px solid var(--border)}
+.brand{grid-row:1;display:flex;align-items:center;gap:8px;padding:0 20px;font-weight:700;font-size:17px;background:var(--surface-2);border-bottom:1px solid var(--border)}
+.brand .bear{width:34px;height:34px}
+h1{font-size:22px;line-height:28px;font-weight:600;margin:0;letter-spacing:.02em}
+.search{flex:1;max-width:520px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 14px;color:var(--text-2)}
+.search input{all:unset;flex:1;color:var(--text)}
+.top .sp{flex:1}
+.icon-btn{width:36px;height:36px;border-radius:999px;border:1px solid var(--border);background:var(--surface);display:grid;place-items:center}
+.icon-btn:hover{background:var(--surface-2)}
+.avatar{background:linear-gradient(145deg,#F6D3A4,#C26A2B);border:0;color:#fff;font-weight:700}
+/* sidebar */
+.side{grid-row:2;background:var(--surface-2);padding:16px 12px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--border)}
+.nav{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:6px;border:0;background:none;text-align:left;width:100%;color:var(--text)}
+.nav:hover{background:color-mix(in srgb,var(--text) 6%,transparent)}
+.nav[aria-current=page]{background:var(--surface);box-shadow:inset 3px 0 0 var(--accent);font-weight:600}
+.nav .g{width:20px;text-align:center}
+.nav .cnt{margin-left:auto;font-size:12px;color:var(--text-2)}
+.nav .soon{margin-left:auto;font-size:11px;color:var(--text-2);border:1px solid var(--border);border-radius:999px;padding:0 8px}
+.side hr{border:0;border-top:1px solid var(--border);margin:8px 4px}
+.pet-card{margin-top:auto;border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px}
+.pet-card .bear{width:52px;height:52px;flex:none}
+.pet-card small{color:var(--text-2);display:block}
+/* main */
+main{grid-row:2;grid-column:2;overflow:auto;padding:24px}
+.view{display:none}.view.on{display:block}
+.row{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;margin-bottom:24px}
+@media (max-width:1000px){.row{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+.card-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.card-h h2{font-size:17px;line-height:24px;font-weight:600;margin:0}
+.card-h .sp{flex:1}
+.btn{border:1px solid var(--border);background:var(--surface);border-radius:6px;padding:6px 12px;display:inline-flex;gap:6px;align-items:center}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast);font-weight:600}
+.btn.pri:hover{filter:brightness(1.06);background:var(--accent)}
+.greet{display:flex;align-items:center;gap:12px;background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 14%,var(--surface)),var(--surface));border-radius:8px;padding:8px 12px;margin-bottom:8px}
+.greet .bear{width:64px;height:64px;flex:none;margin:-4px 0}
+.greet b{display:block;font-size:15px}.greet span{color:var(--text-2)}
+.task{display:flex;align-items:center;gap:12px;padding:8px;border-radius:6px;position:relative}
+.task:hover{background:var(--surface-2)}
+.task input{appearance:none;width:20px;height:20px;border:2px solid var(--text-2);border-radius:50%;display:grid;place-items:center;margin:0;cursor:pointer;flex:none}
+.task input:checked{background:var(--success);border-color:var(--success)}
+.task input:checked::after{content:"✓";color:#fff;font-size:12px;font-weight:700}
+.task input:focus-visible{box-shadow:var(--ring)}
+.task .t{flex:1;min-width:0}
+.task input:checked ~ .t .name{text-decoration:line-through;color:var(--text-2)}
+.meta{color:var(--text-2);font-size:12px;line-height:16px}
+.pri-h{color:var(--accent)}.pri-m,.pri-l{color:var(--text-2)}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;background:var(--surface-2);padding:0 8px;font-size:12px;line-height:20px}
+.chip.over{color:var(--danger);background:color-mix(in srgb,var(--danger) 12%,transparent)}
+.menu{position:relative}
+.menu>button{width:28px;height:28px;border:0;background:none;border-radius:6px;color:var(--text-2)}
+.menu>button:hover{background:var(--border)}
+.menu ul{display:none;position:absolute;right:0;top:30px;z-index:5;list-style:none;margin:0;padding:4px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);min-width:130px}
+.menu.open ul{display:block}
+.menu li button{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 10px;border-radius:6px}
+.menu li button:hover{background:var(--surface-2)}.menu li .del{color:var(--danger)}
+.tabs{display:flex;gap:4px;background:var(--surface-2);border-radius:8px;padding:3px;margin-bottom:8px}
+.tabs button{flex:1;border:0;background:none;border-radius:6px;padding:4px 10px}
+.tabs [aria-selected=true]{background:var(--surface);font-weight:600;box-shadow:0 1px 2px rgb(0 0 0/.1)}
+.empty-note{color:var(--text-2);padding:8px}
+.rem{display:flex;gap:10px;align-items:center;padding:8px;border-radius:6px}
+.rem:hover{background:var(--surface-2)}.rem .t{flex:1}
+/* notes */
+.composer{max-width:600px;margin:0 auto 24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 1px 3px rgb(0 0 0/.08);overflow:hidden}
+.composer input,.composer textarea{all:unset;display:block;width:100%;padding:12px 16px;color:var(--text);box-sizing:border-box}
+.composer textarea{min-height:76px;white-space:pre-wrap}
+.composer .full{display:none}.composer.open .full{display:block}.composer.open .collapsed{display:none}
+.composer .tools{display:none;align-items:center;gap:4px;padding:4px 8px 8px}
+.composer.open .tools{display:flex}.composer .tools .sp{flex:1}
+.sec-t{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-2);margin:0 0 8px 2px;font-weight:600}
+.grid{columns:220px;column-gap:12px;margin-bottom:24px}
+.note{break-inside:avoid;margin:0 0 12px;border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface);position:relative;transition:box-shadow 80ms ease-out}
+.note:hover{box-shadow:var(--shadow)}
+.note h3{font-size:15px;line-height:22px;margin:0 28px 4px 0;font-weight:600}
+.note p{margin:0;color:var(--text);white-space:pre-line}
+.note .chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.note .pin{position:absolute;top:8px;right:8px;width:28px;height:28px;border:0;background:none;border-radius:999px;opacity:0;color:var(--text-2)}
+.note:hover .pin,.note .pin:focus-visible,.note .pin[aria-pressed=true]{opacity:1}
+.note .pin[aria-pressed=true]{color:var(--accent)}
+.note .acts{display:flex;gap:2px;margin-top:8px;opacity:0}
+.note:hover .acts,.note:focus-within .acts{opacity:1}
+.note .acts button{border:0;background:none;width:28px;height:28px;border-radius:999px;color:var(--text-2)}
+.note .acts button:hover{background:color-mix(in srgb,var(--text) 10%,transparent)}
+.c-red{background:var(--n-red)}.c-orange{background:var(--n-orange)}.c-yellow{background:var(--n-yellow)}.c-green{background:var(--n-green)}.c-teal{background:var(--n-teal)}.c-blue{background:var(--n-blue)}.c-purple{background:var(--n-purple)}
+/* character view */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px}
+@media (max-width:1000px){.stage{grid-template-columns:1fr}}
+.hero{display:grid;place-items:center;min-height:420px;border-radius:10px;background:radial-gradient(circle at 50% 38%,color-mix(in srgb,var(--accent) 18%,var(--surface)),var(--surface) 70%);border:1px solid var(--border)}
+.hero .bear{width:340px;height:340px;filter:drop-shadow(0 18px 18px rgb(0 0 0/.12))}
+.sizes{display:flex;align-items:flex-end;gap:16px;margin-top:8px}
+.sizes figure{margin:0;text-align:center}.sizes figcaption{font-size:12px;color:var(--text-2)}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+.seg button{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:4px 14px}
+.seg [aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast);font-weight:600}
+.lbl{font-size:12px;color:var(--text-2);margin:16px 0 6px;display:block}
+.callout{margin-top:16px;font-size:12px;color:var(--text-2);border-left:3px solid var(--warning);padding-left:10px}
+/* bear poses + life */
+.bear .eyes-shut{opacity:0}
+.bear .arm{transition:transform 120ms ease-out}
+.pose-sleep .eyes-open{opacity:0}.pose-sleep .eyes-shut{opacity:1}
+.pose-wave .arm-r{animation:wave .9s ease-in-out infinite;transform:rotate(-135deg)}
+@keyframes wave{0%,100%{transform:rotate(-135deg)}50%{transform:rotate(-105deg)}}
+.pose-idle .bear-bob,.bear-bob{animation:bob 3.2s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-5px)}}
+.pose-sleep .bear-bob{animation-duration:5s}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="brand"><span data-bear></span> Loaf</div>
+  <header class="top">
+    <h1 id="title">Notes</h1>
+    <label class="search" title="Search is in your sketch; the current spec removed it (D5-A2)">🔍 <input placeholder="Search notes…" aria-label="Search notes"></label>
+    <span class="sp"></span>
+    <button class="icon-btn" id="theme" aria-label="Toggle theme">☾</button>
+    <button class="icon-btn" aria-label="Notifications">🔔</button>
+    <button class="icon-btn avatar" aria-label="Account">Y</button>
+  </header>
+  <nav class="side" aria-label="Main">
+    <button class="nav" data-view="today"><span class="g">☀</span>Today<span class="cnt">3</span></button>
+    <button class="nav" data-view="time"><span class="g">◷</span>Time</button>
+    <button class="nav" data-view="notes" aria-current="page"><span class="g">✎</span>Notes<span class="cnt">7</span></button>
+    <button class="nav" data-view="character"><span class="g">🐻</span>Character</button>
+    <button class="nav" data-view="mcp"><span class="g">⚡</span>MCP<span class="soon">Phase 5</span></button>
+    <hr>
+    <button class="nav" data-view="settings"><span class="g">⚙</span>Settings</button>
+    <div class="pet-card"><span data-bear></span><div><b>Loaf</b><small>Keeping you company</small></div></div>
+  </nav>
+  <main>
+    <section class="view on" id="v-notes">
+      <div class="row">
+        <div class="card" aria-labelledby="today-h">
+          <div class="greet"><span data-bear data-pose="wave"></span><div><b>Good afternoon!</b><span id="left">2 things left today</span></div></div>
+          <div class="card-h"><h2 id="today-h">Today</h2><span class="sp"></span><button class="btn pri" id="newTask">＋ New</button></div>
+          <div id="tasks">
+            <div class="task"><input type="checkbox" id="t1" aria-label="Design the UI"><div class="t"><div class="name">Design the UI</div><div class="meta"><span class="pri-h">▲ High</span> · <span class="chip">Today 3:00 PM</span></div></div><div class="menu"><button aria-label="More">⋯</button><ul><li><button>Edit</button></li><li><button class="del">Delete</button></li></ul></div></div>
+            <div class="task"><input type="checkbox" id="t2" aria-label="Complete X"><div class="t"><div class="name">Complete X</div><div class="meta"><span class="pri-m">■ Medium</span> · <span class="chip over">! Overdue · Yesterday</span></div></div><div class="menu"><button aria-label="More">⋯</button><ul><li><button>Edit</button></li><li><button class="del">Delete</button></li></ul></div></div>
+            <div class="task"><input type="checkbox" id="t3" aria-label="Refactor Y"><div class="t"><div class="name">Refactor Y</div><div class="meta"><span class="pri-l">▼ Low</span> · <span class="chip">Today 6:30 PM</span></div></div><div class="menu"><button aria-label="More">⋯</button><ul><li><button>Edit</button></li><li><button class="del">Delete</button></li></ul></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tabs" role="tablist"><button role="tab" aria-selected="true" data-tab="rem">Reminders</button><button role="tab" aria-selected="false" data-tab="bin">Bin</button></div>
+          <div id="tab-rem">
+            <div class="rem"><span>🔔</span><div class="t">Stand-up<div class="meta">Today 10:00 AM</div></div></div>
+            <div class="rem"><span>🔔</span><div class="t">Call the dentist<div class="meta">Tomorrow 9:00 AM</div></div></div>
+            <div class="rem"><span>🔔</span><div class="t">Send invoice<div class="meta">Friday 4:00 PM</div></div></div>
+          </div>
+          <div id="tab-bin" hidden>
+            <div class="rem"><span>🗑</span><div class="t">Old grocery list<div class="meta">Deleted yesterday</div></div><button class="btn">Restore</button></div>
+            <div class="rem"><span>🗑</span><div class="t">Draft: release notes<div class="meta">Deleted 3 days ago</div></div><button class="btn">Restore</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer" id="composer">
+        <input class="collapsed" placeholder="Take a note…" aria-label="Take a note">
+        <div class="full"><input id="nt" placeholder="Title" style="font-weight:600;font-size:15px" aria-label="Title"><textarea id="nb" aria-label="Note" placeholder="Take a note…"></textarea></div>
+        <div class="tools"><button class="icon-btn" aria-label="Pin">📌</button><button class="icon-btn" aria-label="Label">🏷</button><button class="icon-btn" aria-label="Color">🎨</button><span class="sp"></span><button class="btn" id="closeC">Close</button></div>
+      </div>
+
+      <h3 class="sec-t">Pinned</h3>
+      <div class="grid" id="pinned"></div>
+      <h3 class="sec-t">Other notes</h3>
+      <div class="grid" id="others"></div>
+    </section>
+
+    <section class="view" id="v-character">
+      <div class="stage">
+        <div class="hero" id="hero"><div class="bear-bob" data-bear data-pose="idle"></div></div>
+        <div class="card">
+          <div class="card-h"><h2>Loaf the bear</h2></div>
+          <span class="meta">A round, bread-toned bear. Rendered 3D look, shipped as a flat image.</span>
+          <span class="lbl">Pose</span>
+          <div class="seg" id="poses"><button aria-pressed="true" data-pose="idle">Idle</button><button aria-pressed="false" data-pose="wave">Wave</button><button aria-pressed="false" data-pose="sleep">Sleepy</button></div>
+          <span class="lbl">Pet sizes in the app (S / M / L)</span>
+          <div class="sizes"><figure><span data-bear data-w="64"></span><figcaption>64 px</figcaption></figure><figure><span data-bear data-w="96"></span><figcaption>96 px</figcaption></figure><figure><span data-bear data-w="128"></span><figcaption>128 px</figcaption></figure></div>
+          <p class="callout">Real-time 3D (WebGL) is ruled out by ADR-008 and the RAM budget. The depth here comes from shading in a pre-rendered sprite.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="v-other"><div class="card"><div class="card-h"><h2 id="other-h"></h2></div><p class="meta">Not part of this prototype.</p></div></section>
+  </main>
+</div>
+
+<template id="bear-tpl">
+<svg class="bear" viewBox="0 0 200 200" role="img" aria-label="Loaf the bear" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="fur" cx="35%" cy="25%" r="85%"><stop offset="0" stop-color="#F6D3A4"/><stop offset=".45" stop-color="#E0A163"/><stop offset="1" stop-color="#A9672F"/></radialGradient>
+    <radialGradient id="furDark" cx="35%" cy="25%" r="90%"><stop offset="0" stop-color="#E7B27A"/><stop offset="1" stop-color="#93561F"/></radialGradient>
+    <radialGradient id="belly" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#FFF1DA"/><stop offset="1" stop-color="#EBC391"/></radialGradient>
+    <radialGradient id="earIn" cx="40%" cy="35%" r="80%"><stop offset="0" stop-color="#FFC2B8"/><stop offset="1" stop-color="#D98476"/></radialGradient>
+    <radialGradient id="nose" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#6B4A3A"/><stop offset="1" stop-color="#241410"/></radialGradient>
+    <radialGradient id="eye" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#5B4036"/><stop offset="1" stop-color="#17100D"/></radialGradient>
+    <radialGradient id="gloss" cx="30%" cy="20%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4"/></filter>
+  </defs>
+  <ellipse cx="100" cy="188" rx="62" ry="8" fill="#000" opacity=".22" filter="url(#soft)"/>
+  <g class="feet"><ellipse cx="70" cy="178" rx="19" ry="12" fill="url(#furDark)"/><ellipse cx="130" cy="178" rx="19" ry="12" fill="url(#furDark)"/>
+    <ellipse cx="70" cy="180" rx="9" ry="6" fill="url(#earIn)" opacity=".8"/><ellipse cx="130" cy="180" rx="9" ry="6" fill="url(#earIn)" opacity=".8"/></g>
+  <ellipse cx="100" cy="140" rx="56" ry="46" fill="url(#fur)"/>
+  <ellipse cx="100" cy="148" rx="33" ry="30" fill="url(#belly)"/>
+  <ellipse cx="82" cy="118" rx="22" ry="12" fill="url(#gloss)" opacity=".5"/>
+  <g class="arm arm-l" style="transform-origin:58px 122px"><ellipse cx="50" cy="140" rx="14" ry="25" transform="rotate(14 50 140)" fill="url(#furDark)"/><ellipse cx="46" cy="130" rx="6" ry="10" fill="url(#gloss)" opacity=".6"/></g>
+  <g class="arm arm-r" style="transform-origin:142px 122px"><ellipse cx="150" cy="140" rx="14" ry="25" transform="rotate(-14 150 140)" fill="url(#furDark)"/><ellipse cx="146" cy="130" rx="6" ry="10" fill="url(#gloss)" opacity=".6"/></g>
+  <g class="ears"><circle cx="54" cy="36" r="20" fill="url(#furDark)"/><circle cx="54" cy="38" r="11" fill="url(#earIn)"/>
+    <circle cx="146" cy="36" r="20" fill="url(#furDark)"/><circle cx="146" cy="38" r="11" fill="url(#earIn)"/></g>
+  <g class="head">
+    <ellipse cx="100" cy="80" rx="60" ry="52" fill="url(#fur)"/>
+    <path d="M78 36 q6 -5 10 1 M95 31 q6 -5 10 0 M112 36 q6 -5 10 1" fill="none" stroke="#B97A3E" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+    <ellipse cx="78" cy="52" rx="30" ry="15" fill="url(#gloss)"/>
+    <ellipse cx="64" cy="94" rx="10" ry="6.5" fill="#FF8F86" opacity=".45"/><ellipse cx="136" cy="94" rx="10" ry="6.5" fill="#FF8F86" opacity=".45"/>
+    <ellipse cx="100" cy="95" rx="26" ry="19" fill="url(#belly)"/>
+    <g class="eyes-open"><ellipse cx="77" cy="72" rx="8" ry="9" fill="url(#eye)"/><ellipse cx="123" cy="72" rx="8" ry="9" fill="url(#eye)"/>
+      <circle cx="74.5" cy="68.5" r="3.2" fill="#fff"/><circle cx="120.5" cy="68.5" r="3.2" fill="#fff"/><circle cx="80" cy="76" r="1.6" fill="#fff" opacity=".8"/><circle cx="126" cy="76" r="1.6" fill="#fff" opacity=".8"/></g>
+    <g class="eyes-shut" fill="none" stroke="#3A2620" stroke-width="3.5" stroke-linecap="round"><path d="M68 74 q9 8 18 0"/><path d="M114 74 q9 8 18 0"/></g>
+    <ellipse cx="100" cy="86" rx="9.5" ry="6.5" fill="url(#nose)"/><ellipse cx="97" cy="84" rx="3.5" ry="1.8" fill="#fff" opacity=".6"/>
+    <path d="M100 92 v5 M100 97 q-7 7 -15 1 M100 97 q7 7 15 1" fill="none" stroke="#3A2620" stroke-width="2.6" stroke-linecap="round"/>
+  </g>
+</svg>
+
+</template>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+let uid=0;
+function mountBear(host){
+  const n=++uid, html=$('#bear-tpl').innerHTML.replace(/id="([^"]+)"/g,`id="$1-${n}"`).replace(/url\(#([^)]+)\)/g,`url(#$1-${n})`);
+  host.innerHTML=html;
+  const svg=host.firstElementChild; if(host.dataset.w){svg.style.width=svg.style.height=host.dataset.w+'px'}
+  host.classList.add('pose-'+(host.dataset.pose||'idle'));
+}
+$$('[data-bear]').forEach(mountBear);
+
+const notes=[
+ {t:'Loaf v1 scope',b:'Notes, tasks, meetings, daily logs.\nEverything stays on this computer.',c:'c-orange',pin:1,l:['product']},
+ {t:'Shortcuts',b:'Ctrl+N  new note\nCtrl+1…5  switch view',c:'c-blue',pin:1,l:['ideas']},
+ {t:'Bear animations',b:'Idle bob, wave on new note, sleepy after 10 min idle.',c:'c-teal',pin:1,l:['pet']},
+ {t:'Groceries',b:'Oats\nPeanut butter\nBananas\nCoffee beans',c:'c-yellow',l:['home']},
+ {t:'Meeting prep',b:'Questions for Friday:\n- budget\n- timeline',c:'c-purple',l:['work']},
+ {t:'Reading list',b:'Designing Data-Intensive Apps\nThe Pragmatic Programmer',c:'',l:['books']},
+ {t:'Idea',b:'Weekly review note that builds itself from daily logs.',c:'c-green',l:['ideas']},
+];
+function card(n){
+  const el=document.createElement('article');el.className='note '+n.c;
+  el.innerHTML=`<button class="pin" aria-pressed="${!!n.pin}" aria-label="Pin note">📌</button><h3></h3><p></p><div class="chips">${(n.l||[]).map(x=>`<span class="chip">${x}</span>`).join('')}</div><div class="acts"><button aria-label="Color">🎨</button><button aria-label="Archive">🗄</button><button aria-label="Delete">🗑</button></div>`;
+  $('h3',el).textContent=n.t;$('p',el).textContent=n.b;
+  $('.pin',el).onclick=e=>{const on=e.currentTarget.getAttribute('aria-pressed')!=='true';e.currentTarget.setAttribute('aria-pressed',on);(on?$('#pinned'):$('#others')).prepend(el)};
+  $('[aria-label=Delete]',el).onclick=()=>el.remove();
+  return el;
+}
+notes.forEach(n=>(n.pin?$('#pinned'):$('#others')).append(card(n)));
+
+const comp=$('#composer');
+$('.collapsed',comp).onfocus=()=>{comp.classList.add('open');$('#nt').focus()};
+$('#closeC').onclick=()=>{const t=$('#nt').value.trim(),b=$('#nb').value.trim();
+  if(t||b){$('#others').prepend(card({t:t||'Untitled',b,c:'',l:[]}))}
+  $('#nt').value=$('#nb').value='';comp.classList.remove('open')};
+
+function left(){const n=$$('#tasks input:not(:checked)').length;$('#left').textContent=n?`${n} thing${n>1?'s':''} left today`:'All done today — nice!'}
+$$('#tasks input').forEach(i=>i.onchange=left);left();
+$$('.menu>button').forEach(b=>b.onclick=e=>{e.stopPropagation();const m=b.parentElement,o=m.classList.contains('open');$$('.menu').forEach(x=>x.classList.remove('open'));if(!o)m.classList.add('open')});
+document.onclick=()=>$$('.menu').forEach(x=>x.classList.remove('open'));
+$$('.tabs button').forEach(b=>b.onclick=()=>{$$('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));$('#tab-rem').hidden=b.dataset.tab!=='rem';$('#tab-bin').hidden=b.dataset.tab!=='bin'});
+
+const titles={notes:'Notes',character:'Character',today:'Today',time:'Time',mcp:'MCP',settings:'Settings'};
+function show(v){
+  $$('.nav').forEach(n=>n.toggleAttribute('aria-current',n.dataset.view===v)); $$('.nav[aria-current]').forEach(n=>n.setAttribute('aria-current','page'));
+  $$('.nav').forEach(n=>{if(n.dataset.view!==v)n.removeAttribute('aria-current')});
+  $$('.view').forEach(s=>s.classList.remove('on'));
+  const id=(v==='notes'||v==='character')?'v-'+v:'v-other';$('#'+id).classList.add('on');
+  $('#title').textContent=titles[v];$('#other-h').textContent=titles[v];
+}
+$$('.nav').forEach(n=>n.onclick=()=>show(n.dataset.view));
+$$('#poses button').forEach(b=>b.onclick=()=>{$$('#poses button').forEach(x=>x.setAttribute('aria-pressed',x===b));const h=$('#hero [data-bear]');h.className=h.className.replace(/pose-\w+/g,'')+' pose-'+b.dataset.pose});
+$('#theme').onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'};
+if(location.hash==='#character')show('character');if(location.hash==='#dark')document.documentElement.dataset.theme='dark';
+</script>
+</body>
+</html>
