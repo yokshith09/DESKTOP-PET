@@ -115,6 +115,9 @@ pub enum Event {
         log_date: String,
         reconstructed: bool,
     },
+    ResyncRequired {
+        at: i64,
+    },
 }
 
 impl Event {
@@ -142,7 +145,8 @@ impl Event {
             | Self::DataImported { at, .. }
             | Self::AllDataDeleted { at }
             | Self::DayRolledOver { at, .. }
-            | Self::DailyLogFrozen { at, .. } => *at,
+            | Self::DailyLogFrozen { at, .. }
+            | Self::ResyncRequired { at } => *at,
         }
     }
 
@@ -171,6 +175,7 @@ impl Event {
             Self::AllDataDeleted { .. } => "AllDataDeleted",
             Self::DayRolledOver { .. } => "DayRolledOver",
             Self::DailyLogFrozen { .. } => "DailyLogFrozen",
+            Self::ResyncRequired { .. } => "ResyncRequired",
         }
     }
 }
@@ -275,6 +280,7 @@ pub(crate) fn one_of_each() -> Vec<Event> {
             log_date: "2026-10-03".into(),
             reconstructed: true,
         },
+        Event::ResyncRequired { at: 23 },
     ]
 }
 
@@ -307,6 +313,7 @@ mod tests {
         "AllDataDeleted",
         "DayRolledOver",
         "DailyLogFrozen",
+        "ResyncRequired",
     ];
 
     #[test]
@@ -318,7 +325,7 @@ mod tests {
     #[test]
     fn names_are_past_tense_apart_from_the_two_lifecycle_exceptions() {
         for name in TRD_NAMES {
-            let exception = matches!(*name, "AppReady" | "AppShuttingDown");
+            let exception = matches!(*name, "AppReady" | "AppShuttingDown" | "ResyncRequired");
             // Regular past tense ends in "ed"; "Frozen" is the one irregular form, and
             // "RolledOver" ends in its particle.
             let past = name.ends_with("ed") || name.ends_with("Frozen") || name.ends_with("Over");

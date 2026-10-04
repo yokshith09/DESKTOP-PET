@@ -14,6 +14,8 @@ pub mod labels;
 pub mod logging;
 pub mod notes;
 pub mod scheduler;
+pub mod settings;
+pub mod settings_service;
 pub mod tasks;
 
 /// The version of the core, taken from the workspace package version.
