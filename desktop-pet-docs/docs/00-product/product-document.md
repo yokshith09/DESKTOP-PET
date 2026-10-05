@@ -1,6 +1,6 @@
 # LOAF — Product Document
-**Version 1.0** · **Status: 🔒 LOCKED (D0)**  
-**Last updated:** September 30, 2026
+**Version 1.4** · **Status: 🔒 LOCKED (D0) · amended D0-A1 … D0-A4**  
+**Last updated:** October 3, 2026 (see §15 Amendments)
 
 ---
 
@@ -128,7 +128,7 @@ Examples:
 
 ## 4. Product Components
 
-### 4.1 Notes System (P0)
+### 4.1 Notes System (Priority P0 · Phase 1)
 
 **Definition:** A lightweight note-taking system inspired by Google Keep, structured around work and daily context.
 
@@ -141,7 +141,6 @@ Examples:
 | **Color** | Visual grouping (system provides 6–8 standard colors) |
 | **Pin** | Boolean flag to keep note at top of list |
 | **Archive** | Boolean flag to move note out of active view |
-| **Search** | Full-text search across title, body, labels |
 | **Created** | ISO timestamp of creation |
 | **Last Edited** | ISO timestamp of last modification |
 
@@ -154,7 +153,6 @@ Examples:
 - Archive/unarchive
 - Delete permanently
 - Restore from archive
-- Search across all notes
 - Sort by: recently edited, created date, label, color, pin status
 - Support for plain text and Markdown
 - Survive application restart
@@ -178,7 +176,7 @@ CREATE → ACTIVE → EDIT → ACTIVE → ARCHIVE → RESTORE → ACTIVE → DEL
 
 ---
 
-### 4.2 Task System (P0)
+### 4.2 Task System (Priority P0 · Phase 1)
 
 **Definition:** Task management system integrated with notes, designed around daily work planning and completion tracking.
 
@@ -208,7 +206,6 @@ CREATE → ACTIVE → EDIT → ACTIVE → ARCHIVE → RESTORE → ACTIVE → DEL
 - Add work updates (progress notes)
 - View completion history (what was done, when)
 - Link tasks to notes
-- Search tasks by title, description, tags
 - Filter tasks by status, date, priority, project
 - See pending tasks (not yet started, not completed)
 - Fast task lookup by date
@@ -245,7 +242,7 @@ CANCELLED
 
 ---
 
-### 4.3 Daily Work Log (P0)
+### 4.3 Daily Work Log (Priority P0 · Phase 1)
 
 **Definition:** Automatic daily summary that aggregates planned, in-progress, completed, and pending tasks for a given day.
 
@@ -277,7 +274,7 @@ CANCELLED
 
 ---
 
-### 4.4 Meetings System (P0)
+### 4.4 Meetings System (Priority P0 · Phase 1)
 
 **Definition:** Structured note type for capturing meeting context, decisions, and action items.
 
@@ -302,7 +299,7 @@ CANCELLED
 - Capture action items with assignees
 - Link action items to tasks
 - Later: auto-populate from voice/transcription
-- Search meetings by title, date, participant, decision
+- Filter meetings by date and participant
 - Generate meeting summary
 
 **Meeting to Task conversion:**
@@ -314,37 +311,17 @@ CANCELLED
 **Constraints:**
 - No automatic recording in v1
 - No transcription in v1
-- Voice transcription comes in Phase 4
+- Meeting transcription arrives with Voice, in Phase 6
 
 ---
 
-### 4.5 Search System (P0)
+### 4.5 Search System — ❌ REMOVED (D0-A4)
 
-**Definition:** Full-text search across all workspace content.
-
-**Search scope:**
-- Notes (title, body, labels)
-- Tasks (title, description, tags)
-- Meetings (title, discussion, decisions, participants)
-- Daily logs (aggregated content)
-
-**Search capabilities:**
-- Full-text search (matches partial words)
-- Filter by type (notes, tasks, meetings)
-- Filter by date range
-- Filter by label/tag
-- Filter by status (for tasks)
-- Sort results by relevance, date, type
-- Search is case-insensitive
-- Special characters are indexed (e.g., #hashtags, @mentions)
-
-**Performance constraint:**
-- Search completes in <500ms for typical workspace (5000+ items)
-- Uses SQLite FTS5 (Full Text Search)
+Global search was withdrawn by the product owner on 2026-10-03 (ADR-017). The workspace is navigated through sidebar views, label filters, and per-view filters and sorts: notes by label, tasks by status/priority/project/date, meetings by date and participant. No full-text index exists. Section number 4.5 is kept so §4.6 onward do not renumber.
 
 ---
 
-### 4.6 Pet System (P0)
+### 4.6 Pet System (Priority P0 · Phase 1 minimal · Phase 3 reactive)
 
 **Definition:** A persistent, always-present animated desktop companion that reacts to system events.
 
@@ -396,7 +373,7 @@ CANCELLED
 
 ---
 
-### 4.7 Browser Tracking System (P1)
+### 4.7 Browser Tracking System (Priority P1 · Phase 2)
 
 **Definition:** Multi-browser activity tracking system that records which websites and apps consume user time.
 
@@ -452,7 +429,7 @@ Safari Extension ──┘
 
 ---
 
-### 4.8 Time & Activity Tracking System (P1)
+### 4.8 Time & Activity Tracking System (Priority P1 · Phase 2)
 
 **Definition:** Automatic tracking of app usage, browser usage, and time allocation across the workday.
 
@@ -482,7 +459,7 @@ Safari Extension ──┘
 
 ---
 
-### 4.9 Dashboard & Insights System (P1)
+### 4.9 Dashboard & Insights System (Priority P1 · Phase 2)
 
 **Definition:** Visual summary of daily, weekly, and historical activity patterns.
 
@@ -531,7 +508,7 @@ Safari Extension ──┘
 
 ---
 
-### 4.10 Settings & Configuration (P0)
+### 4.10 Settings & Configuration (Priority P0 · Phase 1)
 
 **Definition:** User-accessible controls for behavior, tracking, privacy, and UI preferences.
 
@@ -545,7 +522,7 @@ Safari Extension ──┘
 | **Privacy** | Data export (all data as JSON), Data delete (confirm & wipe all), Encryption at rest (yes/no) |
 | **Notifications** | Pet reactions (yes/no), Task notifications (yes/no), Browser notifications (yes/no) |
 | **Appearance** | Light/dark theme, Font size, Language (English, others later) |
-| **Keyboard** | Shortcuts for new note, new task, show/hide pet, search |
+| **Keyboard** | Shortcuts for new note, new task, show/hide pet |
 | **Advanced** | SQLite path (for backup), Log level (debug/info/warn), Clear cache, Reset to defaults |
 
 **Constraints:**
@@ -556,7 +533,7 @@ Safari Extension ──┘
 
 ---
 
-### 4.11 Voice System (P3)
+### 4.11 Voice System (Priority P3 · Phase 6)
 
 **Definition:** Voice interface for creating notes, tasks, and querying workspace (uses JEV model through provider layer).
 
@@ -583,7 +560,7 @@ Microphone → Audio Buffer → Wake Detection → JEV → Intent → Action
 
 ---
 
-### 4.12 MCP Integration Layer (P3–P4)
+### 4.12 MCP Integration Layer (Priority P2 · Phase 5, including the MCP client scaffold and OAuth)
 
 **Definition:** Optional integration with external services through Model Context Protocol (MCP).
 
@@ -614,7 +591,7 @@ Microphone → Audio Buffer → Wake Detection → JEV → Intent → Action
 
 ---
 
-### 4.13 Developer Companion Features (P4)
+### 4.13 Developer Companion Features (Priority P2 · Phase 4 local git/build · Phase 5.1 CI)
 
 **Definition:** System reactions to development-specific events.
 
@@ -626,6 +603,8 @@ Microphone → Audio Buffer → Wake Detection → JEV → Intent → Action
 - CI failed (automated tests fail)
 - Deployment started
 - Deployment completed
+
+**Phase split (D0-A3):** git, local build and their reactions ship in Phase 4. CI passed/failed, deployment events and CI-failure task suggestion ship in Phase 5.1, after MCP.
 
 **Pet reactions to developer events:**
 - `git push` → Celebration animation
@@ -639,7 +618,7 @@ Microphone → Audio Buffer → Wake Detection → JEV → Intent → Action
 **Developer companion capabilities:**
 - Watch local git repository for activity
 - Poll or hook into build system
-- Read CI output (GitHub Actions, Jenkins, etc.)
+- Read CI output (GitHub Actions, Jenkins, etc.) — *Phase 5.1*
 - Show build status in dashboard
 - Notify on build failure
 - Suggest task creation on CI failure
@@ -651,7 +630,7 @@ Microphone → Audio Buffer → Wake Detection → JEV → Intent → Action
 
 ---
 
-### 4.14 Character Ecosystem (P5)
+### 4.14 Character Ecosystem (Priority P3 · Phase 7)
 
 **Definition:** Extensible pet character system with multiple characters and customization options.
 
@@ -961,7 +940,6 @@ Pet returns to idle state
 | **App startup time** | <2 seconds |
 | **Note creation** | <100ms |
 | **Task creation** | <100ms |
-| **Search across 5000 items** | <500ms |
 | **Daily log generation** | <500ms |
 | **Dashboard render** | <300ms |
 | **Pet animation framerate** | 30 FPS (not 60) |
@@ -1017,10 +995,10 @@ The following are explicitly **not** part of the initial release but may be adde
 - Subtasks
 - Time estimates
 - Recurring meetings
-- Meeting recording/transcription (v1; added in Phase 4)
-- MCP integrations (v1; added in Phase 3)
-- Voice commands (v1; added in Phase 3)
-- Character customization/closet (v1; added in Phase 5)
+- Meeting recording/transcription (added in Phase 6, with Voice)
+- MCP integrations (added in Phase 5, including the client scaffold)
+- Voice commands (added in Phase 6)
+- Character customization/closet (added in Phase 7)
 - Advanced AI/ML features
 - Themes/dark mode customization (basic only)
 - Mobile app
@@ -1081,7 +1059,7 @@ The following are explicitly **not** part of the initial release but may be adde
         │         │             │           │
     ┌─App    ┌─SQLite       ├─ JEV      ├─Gmail
     ├─Browser├─Backup      ├─Whisper   ├─GitHub
-    ├─Focus  ├─Search       ├─Intent    ├─Slack
+    ├─Focus  ├─Lists        ├─Intent    ├─Slack
     └─File   └─Export       └─Actions   ├─Calendar
                                         └─Custom
 
@@ -1092,10 +1070,61 @@ The following are explicitly **not** part of the initial release but may be adde
 ## 14. Document Governance
 
 - **Owner:** [Product Manager]
-- **Last Updated:** September 30, 2026
-- **Version:** 1.0
-- **Status:** Ready for PRD / TRD / Design Brief development
+- **Last Updated:** October 3, 2026
+- **Version:** 1.4
+- **Status:** 🔒 Locked · amended (see §15)
 
 ---
 
 **This Product Document is the single source of truth for Loaf. All subsequent documents (PRD, TRD, Design Brief, Implementation Plan) derive from this definition.**
+
+---
+
+## 15. Amendments
+
+### Amendment D0-A1 (2026-10-03) — phase/priority labels corrected *(phase numbers superseded by D0-A2 below)*
+
+**Problem.** §4 headings used a single `P<n>` tag for two different things. In §4.1–§4.10 it meant **priority** (P0 = must-have for v1, P1 = next), but in §4.11–§4.14 it was read as **phase**, and those phase numbers contradicted every downstream document: D0 had Voice at P3, MCP at P3–P4, Developer at P4 and Characters at P5, while `02-build-order.md` (locked), the PRD §8 table and the Implementation Plan all use Voice 4, Developer 5, MCP 6, Characters 7.
+
+**Resolution.** Priority and phase are now stated separately in every §4 heading, and the phase numbers follow `02-build-order.md`, which is authoritative for sequencing. Scope is unchanged — nothing moved into or out of v1.
+
+| Component | Was | Now |
+|-----------|-----|-----|
+| §4.1–4.5, §4.10 Notes, Tasks, Daily Log, Meetings, Search, Settings | P0 | Priority P0 · Phase 1 |
+| §4.6 Pet | P0 | Priority P0 · Phase 1 minimal (static sprite) · Phase 3 reactive |
+| §4.7–4.9 Browser, Time & Activity, Dashboard | P1 | Priority P1 · Phase 2 |
+| §4.11 Voice | P3 | Priority P2 · **Phase 4** |
+| §4.12 MCP | P3–P4 | Priority P2 · client scaffold **Phase 4** · integrations **Phase 6** |
+| §4.13 Developer Companion | P4 | Priority P2 · **Phase 5** |
+| §4.14 Character Ecosystem | P5 | Priority P3 · **Phase 7** |
+
+§11 "Out of Scope (V1)" was corrected to match (it had MCP and voice "added in Phase 3", characters "Phase 5"), and its misleading "(v1; added in …)" prefix — which read as though the item were both in and out of v1 — was dropped.
+
+**Authority rule going forward:** phase numbering lives in `01-build-principles/02-build-order.md`. This document states priority; it defers to the build order for sequence.
+
+### Amendment D0-A2 (2026-10-03) — phase order set by the product owner
+
+**Supersedes the phase numbers in D0-A1.** D0-A1 explained D0's `P<n>` tags as priority/phase confusion and aligned phases 4–7 to the build order as it then stood. That explanation was an inference, and the owner has since decided the order directly:
+
+**Notes (1) → Browser (2) → Pet (3) → Developer (4) → MCP (5) → Voice (6) → Characters (7).**
+
+| Component | D0 original | D0-A1 | Now (D0-A2) |
+|-----------|-------------|-------|-------------|
+| §4.13 Developer Companion | P4 | Priority P2 · Phase 5 | Priority P2 · **Phase 4** |
+| §4.12 MCP Integration Layer | P3–P4 | Priority P2 · scaffold Phase 4 · integrations Phase 6 | Priority P2 · **Phase 5**, scaffold and OAuth included |
+| §4.11 Voice System | P3 | Priority P2 · Phase 4 | Priority **P3** · **Phase 6** |
+| §4.14 Character Ecosystem | P5 | Priority P3 · Phase 7 | Unchanged · Phase 7 |
+
+Scope is unchanged — nothing moved into or out of v1. Three knock-on effects, recorded in ADR-015 and `02-build-order.md` A-3: the MCP client scaffold and OAuth moved from the Voice phase to the MCP phase; Developer Companion now runs before OAuth exists, so its CI checks use a keychain-held access token; and meeting transcription follows Voice to Phase 6. §4.4 and §11 were updated to match.
+
+**Authority rule unchanged:** phase numbering lives in `01-build-principles/02-build-order.md`.
+
+### Amendment D0-A3 (2026-10-03) — CI moves after MCP
+
+The product owner decided CI is built after MCP integration. §4.13 splits: git and local-build awareness stay in **Phase 4**; CI status, CI reactions, deployment events and CI-failure task suggestions move to **Phase 5.1**, after MCP and before Voice. No phase renumbering and no change to v1 scope. CI authenticates through the Phase 5 GitHub login, replacing the pasted-token assumption in D0-A2's knock-on notes. See ADR-016 and `02-build-order.md` A-4.
+
+### Amendment D0-A4 (2026-10-03) — global search removed
+
+The product owner will not use search, so it is out of v1. This withdraws **§4.5 in full**, and every search line item elsewhere in this document: "Search" in the Note entity table (§4.1) and capabilities, "Search tasks" (§4.2), "Search meetings" (§4.4 → replaced by a date/participant filter), "search" in the Keyboard settings row (§4.10), the "<500ms search across 5000 items" target (§9.1), and the Search node in the §13 diagram. Where any remaining text conflicts, this amendment governs.
+
+Not affected: per-view filters and sorts, label and participant autocomplete, and the Phase 2 Browser Tabs "Search and filter"/"Search tabs by title" lines (§4.7, §4.9) — those are list filtering and will be specified in Phase 2's PRD addendum. Scope that remains in v1 is otherwise unchanged. See ADR-017.

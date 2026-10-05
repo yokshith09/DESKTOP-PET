@@ -379,3 +379,10 @@ Every bug fix starts with a failing test that reproduces the bug. No exceptions.
 ---
 
 Next: Read **05-learning-fundamentals.md** before making architectural choices.
+
+---
+
+## Amendments
+
+### Amendment A-1 (2026-10-03)
+Global search is removed from v1 (ADR-017). Search items in the Phase 1 test lists — "Database operations (CRUD, search)", "create note → appears in list → search finds it", "NotesHome … Search filters notes", "Search across 100+ notes" — no longer apply. Examples elsewhere in this file, `03-ui-first.md`, `01-core-principles.md` and `06-feature-definition.md` that use search to illustrate a pattern are illustrative only and carry no requirement. Per-view filter tests (label filter, task filters, meeting filters) replace them.

@@ -26,8 +26,6 @@ A budget is the **maximum cost a feature is allowed to add**. If you can't measu
 | Create / edit / delete note or task | <100 ms to UI update |
 | Pin, archive, label, color change | <100 ms |
 | Open note / task / meeting | <150 ms |
-| Search (5000 items, all types) | <500 ms |
-| Search keystroke → results (debounced 300 ms) | <800 ms total |
 | Daily Log view render | <300 ms |
 | Dashboard render (Phase 2) | <300 ms |
 | Close tab from dashboard → tab gone | <500 ms |
@@ -44,9 +42,10 @@ Each phase may only add to idle cost within its allocation. Unused allocation do
 | 1 Notes + minimal pet | ≤0.1% | ≤10 MB | Static pet sprite must cost ~0 CPU |
 | 2 Browser | ≤0.2% | ≤8 MB | Extensions fire on events only; buffered writes |
 | 3 Pet animations | ≤0.2% while animating, 0 while sleeping | ≤8 MB | Sprite sheets loaded once |
-| 4 Voice | 0 when not activated | ≤5 MB | No mic capture outside activation |
-| 5 Developer | ≤0.1% | ≤4 MB | Watchers on `.git` refs only, not whole trees |
-| 6 MCP | ≤0.1% | ≤5 MB | Refresh per ADR-009 exceptions |
+| 4 Developer | ≤0.1% | ≤4 MB | Watchers on `.git` refs only, not whole trees; offline |
+| 5 MCP | ≤0.1% | ≤5 MB | Refresh per ADR-009 exceptions; also carries the MCP client + OAuth scaffold |
+| 5.1 CI status | set at its start-of-phase estimate | set at its start-of-phase estimate | Polling only while a build runs (ADR-009); must fit inside the totals — unused allocation does not roll over |
+| 6 Voice | 0 when not activated | ≤5 MB | No mic capture outside activation |
 | 7 Characters | 0 | ≤5 MB resident | Only the active character's assets in memory |
 | **Total** | **<1%** | **<100 MB** | |
 
@@ -63,7 +62,7 @@ If Phase 0 measures a higher baseline, later allocations shrink — the total ne
 - Instrument the core: log a timestamp at process start and when the frontend signals "ready." Report median of 10 cold launches (after reboot or cache clear).
 
 ### Interactions
-- Rust benchmarks (`criterion`) for DB operations and search.
+- Rust benchmarks (`criterion`) for DB operations and list/view queries.
 - Frontend: Performance API marks around user action → render complete.
 - Seed fixture: 5000 mixed items (3000 notes, 1500 tasks, 300 meetings, 200 daily logs) generated deterministically.
 
@@ -91,14 +90,21 @@ If Phase 0 measures a higher baseline, later allocations shrink — the total ne
 
 *(Appended at the end of each phase. Empty until Phase 0 completes.)*
 
-| Phase | Date | OS | Idle CPU | RAM (sum) | Startup | Search p95 |
-|-------|------|----|----------|-----------|---------|-----------|
-| — | — | — | — | — | — | — |
+| Phase | Date | OS | Idle CPU | RAM (sum) | Startup |
+|-------|------|----|----------|-----------|---------|
+| — | — | — | — | — | — |
 
 ## Amendments
 
-*(None yet.)*
+### Amendment A-2 (2026-10-03)
+Added a Phase 5.1 (CI status) row. Its numbers are deliberately not set here: CI polling moved out of Phase 4 (ADR-016), so the Phase 4 allocation shrinks to local watchers only and 5.1 must be sized from its own feature list and shown to fit under the <1% / <100 MB totals.
+
+### Amendment A-1 (2026-10-03)
+Per-phase allocation rows for Phases 4–6 reordered to follow the owner's phase order (ADR-015): Developer 4, MCP 5, Voice 6. Each phase keeps its own numbers; the totals (<1% CPU, <100 MB) are unchanged. Phase 5 now also hosts the MCP client and OAuth scaffold that previously sat in the Voice phase — it keeps the ≤5 MB allocation, so the start-of-phase re-estimate must show it fits.
 
 ---
 
 Next: **10-team-coordination.md** (⏸ on hold) · **11-quality-gates.md** (⏸ on hold)
+
+### Amendment A-3 (2026-10-03)
+Global search is removed (ADR-017): the two search interaction budgets and the "Search p95" baseline column are deleted, and the 5000-item seed fixture now serves list and view rendering (Today, Tasks, Notes, Daily Log <300 ms) rather than search. Separately, V-2 gets a preliminary CI-runner measurement in F0-02 (ADR-018); the global RAM budget itself is unchanged.

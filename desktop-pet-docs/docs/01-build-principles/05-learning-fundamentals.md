@@ -1,6 +1,6 @@
 # Learning Fundamentals — Understand Before You Build
 
-> **Status: 🔒 LOCKED** — v1.0, 2026-10-02. Changes require a written amendment at the bottom of this file.
+> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **amended A-1 (2026-10-03)**. Changes require a written amendment at the bottom of this file.
 
 Loaf's constraints (event-driven, <1% idle CPU, <100 MB RAM, local-first) cannot be met by copying patterns you don't understand. This file defines **what you must understand before building each layer**, and how to learn it without stalling the build.
 
@@ -35,9 +35,8 @@ Any of these = stop, learn the concept, write it down, continue.
 
 | Concept | Why | Done when you can… |
 |---------|-----|--------------------|
-| SQLite FTS5 | Search <500 ms on 5000 items | Build an FTS5 table, keep it in sync with triggers, rank results |
 | React state & rendering | Notes UI | Explain what triggers a re-render and prevent unnecessary ones |
-| Controlled inputs + debouncing | Search, editors | Implement a 300 ms debounce without a library |
+| Controlled inputs + debouncing | Autosave in editors | Implement an 800 ms debounce without a library |
 | Keyboard event handling | Shortcuts | Handle Ctrl/Cmd differences across OSes |
 | Date/time & timezones | Daily Log, due dates | Explain why you store UTC and render local |
 | Schema migrations | Data survives upgrades | Write a forward migration and test it against old data |
@@ -65,12 +64,12 @@ Any of these = stop, learn the concept, write it down, continue.
 
 | Concept | Phase | Done when you can… |
 |---------|-------|--------------------|
-| Audio capture & permissions | 4 | Request mic permission on both OSes, capture only on activation |
-| Intent parsing basics | 4 | Map an utterance to a structured intent with confidence + fallback |
-| OAuth 2.0 + PKCE for desktop apps | 4, 6 | Explain loopback redirect and why desktop apps can't hold a client secret |
-| MCP protocol (client side) | 4, 6 | Connect to an MCP server, list tools, call one |
-| File-system watchers | 5 | Watch `.git` without recursive overload (`notify` crate) |
-| Secure credential storage | 4, 6 | Store tokens in OS keychain / Credential Manager, never in SQLite |
+| File-system watchers | 4 | Watch `.git` without recursive overload (`notify` crate) |
+| Secure credential storage | 5 | Store tokens in OS keychain / Credential Manager, never in SQLite |
+| OAuth 2.0 + PKCE for desktop apps | 5 | Explain loopback redirect and why desktop apps can't hold a client secret |
+| MCP protocol (client side) | 5 | Connect to an MCP server, list tools, call one |
+| Audio capture & permissions | 6 | Request mic permission on both OSes, capture only on activation |
+| Intent parsing basics | 6 | Map an utterance to a structured intent with confidence + fallback |
 | Asset packaging & lazy loading | 7 | Load a character pack only when selected |
 
 ## How to Learn (Without Stalling)
@@ -114,6 +113,27 @@ Before adding any crate or npm package, answer in the PR:
 - ❌ Choosing a library because it's popular, not because it fits the constraints
 - ❌ Learning a whole framework before writing line one
 - ❌ Optimizing code you haven't measured
+
+---
+
+## Amendments
+
+### Amendment A-3 (2026-10-03)
+Secure credential storage moves from Phases 4, 5 to Phase 5 only: Phase 4 is offline and holds no credentials (ADR-016).
+
+### Amendment A-2 (2026-10-03)
+Phase column and row order of the "Before Phases 4–7" table follow the owner's phase order (ADR-015): Developer 4, MCP 5, Voice 6, Characters 7.
+
+### Amendment A-1 (2026-10-03)
+The Phase 1 FTS5 row said to keep the index in sync "with triggers", echoing
+the original wording of ADR-006. ADR-014 supersedes that: the index is
+maintained by the repository layer inside the source write's transaction.
+The learning requirement is unchanged in substance — you must still be able
+to build an FTS5 table and rank results — but the mechanism to understand is
+transactional reindexing, not trigger authoring.
+
+### Amendment A-4 (2026-10-03)
+The SQLite FTS5 row is removed (ADR-017: no search in v1) and the debouncing row now targets editor autosave (800 ms, PRD R1-02) instead of search input. If search is reinstated, ADR-014's discipline (transactional reindexing) is the thing to learn.
 
 ---
 

@@ -6,8 +6,13 @@
 --   booleans     INTEGER 0/1 with CHECK
 -- Connection PRAGMAs (set by Rust on every open, not here):
 --   journal_mode=WAL, foreign_keys=ON, synchronous=NORMAL, busy_timeout=5000
-
-BEGIN;
+--
+-- TRANSACTION OWNERSHIP (ADR-007, backend-schema.md §5):
+--   The migration runner wraps every migration file in a single transaction and
+--   sets `PRAGMA user_version` after the file applies cleanly. This file must
+--   therefore contain NO `BEGIN`/`COMMIT` and NO `PRAGMA user_version` — a
+--   nested BEGIN fails at runtime, and a version set inside the file can drift
+--   from the runner's own bookkeeping.
 
 -- ───────────────────────── Settings & preferences ─────────────────────────
 -- settings          : user-controlled configuration (exported)
@@ -39,13 +44,20 @@ CREATE TABLE notes (
 
 CREATE INDEX idx_notes_active ON notes (archived, pinned DESC, edited_at DESC);
 
+-- `name`        : the label as the user typed it (display form)
+-- `name_folded` : Unicode-lowercased in Rust; the authoritative uniqueness key.
+--                 SQLite's NOCASE collation folds ASCII A–Z only, so it cannot
+--                 enforce "unique case-insensitively" for non-ASCII names
+--                 (É/é, İ/i). Folding in Rust and indexing the folded column
+--                 makes the DB the real constraint, not a partial one.
 CREATE TABLE labels (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 50),
+    name_folded TEXT NOT NULL CHECK (length(name_folded) BETWEEN 1 AND 50),
     created_at  INTEGER NOT NULL
 ) STRICT;
 
-CREATE UNIQUE INDEX idx_labels_name ON labels (name COLLATE NOCASE);
+CREATE UNIQUE INDEX idx_labels_name_folded ON labels (name_folded);
 
 CREATE TABLE note_labels (
     note_id     TEXT NOT NULL REFERENCES notes(id)  ON DELETE CASCADE,
@@ -86,7 +98,9 @@ CREATE INDEX idx_tasks_project        ON tasks (project) WHERE project IS NOT NU
 CREATE TABLE task_events (
     id            INTEGER PRIMARY KEY,       -- rowid, monotonic
     task_id       TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    kind          TEXT NOT NULL CHECK (kind IN ('CREATED','STATUS','DEFERRED','EDITED','DELETED')),
+    -- No 'DELETED' kind: task_events.task_id cascades, so a row recording a
+    -- task's deletion would be erased by that same deletion (see §3.4).
+    kind          TEXT NOT NULL CHECK (kind IN ('CREATED','STATUS','DEFERRED','EDITED')),
     from_status   TEXT,
     to_status     TEXT,
     from_date     TEXT,
@@ -116,7 +130,7 @@ CREATE TABLE meetings (
     title           TEXT NOT NULL CHECK (length(title) BETWEEN 1 AND 200),
     starts_at       INTEGER NOT NULL,
     notes           TEXT NOT NULL DEFAULT '',
-    transcript      TEXT,                    -- Phase 4
+    transcript      TEXT,                    -- Phase 6 (Voice)
     follow_up_date  TEXT,
     created_at      INTEGER NOT NULL,
     updated_at      INTEGER NOT NULL
@@ -131,6 +145,10 @@ CREATE TABLE meeting_participants (
     PRIMARY KEY (meeting_id, position)
 ) STRICT, WITHOUT ROWID;
 
+-- NOCASE is fine here: this index serves participant autocomplete (a prefix
+-- lookup), not a uniqueness guarantee, so its ASCII-only folding costs nothing
+-- beyond a non-ASCII name occasionally sorting as a separate suggestion.
+-- Contrast `labels.name_folded`, where uniqueness is the point.
 CREATE INDEX idx_participants_name ON meeting_participants (name COLLATE NOCASE);
 
 CREATE TABLE meeting_decisions (
@@ -171,27 +189,7 @@ BEGIN SELECT RAISE(ABORT, 'daily_logs are immutable'); END;
 CREATE TRIGGER daily_logs_no_delete BEFORE DELETE ON daily_logs
 BEGIN SELECT RAISE(ABORT, 'daily_logs cannot be deleted'); END;
 
--- ───────────────────────────────── Search ────────────────────────────────
--- One unified FTS5 index, maintained by the Rust repository layer inside the
--- same transaction as the source write (see backend-schema.md §5).
-CREATE VIRTUAL TABLE search_index USING fts5(
-    entity_type UNINDEXED,                    -- 'note' | 'task' | 'meeting' | 'daily_log'
-    entity_id   UNINDEXED,
-    title,
-    body,
-    extra,                                    -- labels, project, participants, decisions…
-    tokenize = "unicode61 remove_diacritics 2 tokenchars '#@'",
-    prefix   = '2 3'
-);
+-- No search tables: global search was withdrawn (ADR-017). Re-adding it is a
+-- new migration that creates the index and backfills it from the source tables.
 
--- Lookup table so updates/deletes can find the FTS rowid without scanning.
-CREATE TABLE search_map (
-    entity_type TEXT NOT NULL,
-    entity_id   TEXT NOT NULL,
-    fts_rowid   INTEGER NOT NULL,
-    PRIMARY KEY (entity_type, entity_id)
-) STRICT, WITHOUT ROWID;
-
-PRAGMA user_version = 1;
-
-COMMIT;
+-- `PRAGMA user_version = 1` is set by the migration runner, not here (see header).

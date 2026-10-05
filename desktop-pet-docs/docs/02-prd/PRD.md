@@ -1,7 +1,8 @@
 # Loaf — Product Requirements Document (PRD)
 
-**Milestone:** D2 · **Version:** 1.0 · **Date:** 2026-10-02 · **Status:** 🟡 Review → lock after approval of §9 decisions
-**Derives from:** `docs/00-product/product-document.md` (D0), `docs/01-build-principles/` (D1)
+**Milestone:** D2 · **Version:** 1.4 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED — §9 decisions D-1…D-10 approved 2026-10-03
+**Derives from:** `docs/00-product/product-document.md` (D0 v1.4), `docs/01-build-principles/` (D1)
+**Changes in v1.1:** §9 approved and locked; §8 phase numbering reconciled with D0. **v1.2:** §8 reordered to the owner's phase order (D0-A2, ADR-015). **v1.3:** CI split out to Phase 5.1 (D2-A3, ADR-016). **v1.4:** global search removed (D2-A4, ADR-017). See §12. **Owner amendment v1.4 (2026-10-04):** Phase-2 app/domain time tracking is pulled forward into the main dashboard as **opt-in (default off, `tracking.apps`), domain-only (no URLs, paths or titles), incognito excluded (extension side), local only, with delete controls** (migration 003, ADR-019). R1-46 and R1-84 are superseded for tracking; D-2 is moot; D-9 is amended: home is **"Today overview"**, combining Today and Dashboard. ADR-017 (no search) is reversed for plain notes search (case-insensitive substring, still no index). Reminders, the Bin (30 days) and calendar events (Phase 5, via MCP) are noted as owner additions. Windows collector first; macOS and the browser extensions follow.
 
 This PRD turns the Product Document into **testable requirements**. Phase 0 and Phase 1 (the first release) are specified to feature level. Phases 2–7 are specified to capability level and get their own PRD addendum before their build starts (Principle 4: one phase at a time).
 
@@ -11,14 +12,14 @@ This PRD turns the Product Document into **testable requirements**. Phase 0 and 
 
 **Problem.** Knowledge workers and students spread their day across notes apps, to-do lists, meeting docs, and browser tabs. At the end of the day they can't easily answer "what did I plan, what did I finish, what's still open, and where did my time go?" — and existing tools that answer this are cloud-based, heavy, or invasive.
 
-**Goal of v1 (Phase 1 release).** A local-first desktop workspace where a user can capture notes, manage tasks through a clear lifecycle, record meetings and turn action items into tasks, see an automatic daily log, and search everything instantly — with a companion pet present on the desktop — while staying under 1% idle CPU and 100 MB RAM.
+**Goal of v1 (Phase 1 release).** A local-first desktop workspace where a user can capture notes, manage tasks through a clear lifecycle, record meetings and turn action items into tasks, and see an automatic daily log — with a companion pet present on the desktop — while staying under 1% idle CPU and 100 MB RAM.
 
 ## 2. Target User
 
 | Persona | Description | Primary need |
 |---------|-------------|--------------|
 | **P1 — Student builder** (primary) | CS student juggling coursework, projects, internships, hackathons | One place for tasks + notes + "what did I do today" |
-| **P2 — Individual developer** | Works in IDE + browser all day | Low-friction capture, later dev-aware companion (Phase 5) |
+| **P2 — Individual developer** | Works in IDE + browser all day | Low-friction capture, later dev-aware companion (Phase 4) |
 | **P3 — Privacy-minded knowledge worker** | Avoids cloud tools for personal work logs | Local data, export/delete control |
 
 **Not targeted in v1:** teams, shared workspaces, mobile users, users needing cloud sync.
@@ -43,7 +44,7 @@ This PRD turns the Product Document into **testable requirements**. Phase 0 and 
 | Tasks with 5-state lifecycle, dates, priority, project, work updates | Recurring tasks, subtasks, time estimates |
 | Meetings with participants, decisions, action items → tasks | Recording, transcription |
 | Daily Work Log (task sections only) | Work-session / app / browser time (Phase 2) |
-| Unified search with filters | Semantic/AI search |
+| Per-view filters and sorts (labels, task status, dates, participants) | Global search (withdrawn, D2-A4), semantic/AI search |
 | Minimal pet (static sprite, drag, hide/show, size, opacity, on-top) | Animations, reactions, sleep (Phase 3) |
 | Tray/menu bar, auto-start, single instance | Voice, MCP, dev companion |
 | Settings, theme, shortcuts, export/import/delete | Encryption at rest, multiple languages |
@@ -82,8 +83,8 @@ Requirement IDs map 1:1 to feature specs (`F1-xx`) in the Implementation Plan.
 | R1-04 | Edit note | Opening a note restores cursor at end; edited timestamp updates only on content change |
 | R1-05 | Delete note | Confirm dialog; 5-second Undo toast; after that the note is gone (no trash in v1) |
 | R1-06 | Pin / unpin | From card hover, editor toolbar, or shortcut; reflects instantly |
-| R1-07 | Archive / restore | Archived notes leave the Notes list, appear in Archive view, remain searchable (marked "Archived") |
-| R1-08 | Labels | Add/remove multiple labels; autocomplete existing; create inline; rename/delete label in Labels manager; deleting a label removes it from notes, not the notes |
+| R1-07 | Archive / restore | Archived notes leave the Notes list, appear in the Archive view until restored |
+| R1-08 | Labels | Add/remove multiple labels; autocomplete existing; create inline; rename/delete label in Labels manager; deleting a label removes it from notes, not the notes. Label names are unique case-insensitively **including non-ASCII** (`work`/`WORK`, `Éclair`/`ÉCLAIR` are the same label) — creating or renaming to an existing name selects it instead of duplicating (Schema §3.2) |
 | R1-09 | Label filter | Sidebar label list filters Notes view; count shown per label |
 | R1-10 | Color | 8 colors + default; color shows on card and editor background tint |
 | R1-11 | Markdown | Body stored as Markdown source; Edit mode = plain text; Preview mode renders headings, lists, checkboxes (read-only), code, links, bold/italic; raw HTML is not rendered |
@@ -101,7 +102,7 @@ Requirement IDs map 1:1 to feature specs (`F1-xx`) in the Implementation Plan.
 | R1-26 | Link note | Task can link to one note; link opens the note; deleting the note clears the link |
 | R1-27 | Task views | Today (planned today + overdue + in progress), Upcoming (next 7 days), Pending, All (with filters: status, priority, project, date range), Completed (history) |
 | R1-28 | Overdue | Task with due date < today and status not COMPLETED/CANCELLED shows Overdue badge |
-| R1-29 | Delete task | Allowed only from CANCELLED or COMPLETED state, with confirm (⚠ deviation — see §9 D-3) |
+| R1-29 | Delete task | Allowed only from CANCELLED or COMPLETED state, with confirm (§9 D-3, approved). Deleting a task erases its `task_events` history; past daily logs are unaffected because snapshots copy titles (Schema §3.4, §3.7) |
 
 #### 6.2.1 Task State Machine (authoritative)
 
@@ -113,7 +114,7 @@ Requirement IDs map 1:1 to feature specs (`F1-xx`) in the Implementation Plan.
 | COMPLETED | ✅ Reopen | ❌ | ❌ | — | ❌ |
 | CANCELLED | ✅ Reopen | ❌ | ❌ | ❌ | — |
 
-\* Direct completion without starting is allowed (users often finish small tasks without marking start). `started_at` stays null in that case. This is an interpretation of D0 §4.2 — see §9 D-4.
+\* Direct completion without starting is allowed (users often finish small tasks without marking start). `started_at` stays null in that case. Resolves D0 §4.2 — see §9 D-4 (approved).
 
 ### 6.3 Meetings
 
@@ -136,19 +137,17 @@ Requirement IDs map 1:1 to feature specs (`F1-xx`) in the Implementation Plan.
 | R1-43 | Missed days | If Loaf was not running on some days, logs for those days are reconstructed from task history on next launch; days with no task/note/meeting activity get no log |
 | R1-44 | History | Calendar/list of past logs; open any day; compare with previous day (deltas on stats) |
 | R1-45 | Export day | Export a single day's log as Markdown |
-| R1-46 | Activity sections | Work sessions / app time / browser time **hidden** until Phase 2 provides data |
+| R1-46 | Activity sections | ~~Hidden until Phase 2~~ **Superseded for tracking (v1.4):** shown once the user opts in; hidden while tracking is off |
 
-### 6.5 Search
+### 6.5 Search — ❌ REMOVED (D2-A4)
 
-| ID | Requirement | Acceptance criteria |
-|----|-------------|---------------------|
-| R1-50 | Global search | `Ctrl/Cmd+K` opens search overlay from anywhere in main window; also via tray "Search" |
-| R1-51 | Scope | Notes (title, body, labels), tasks (title, description, project, work updates), meetings (title, notes, decisions, participants, action items), daily logs (snapshot text) |
-| R1-52 | Matching | Case-insensitive; prefix matching ("hack" finds "hackathon"); `#tags` and `@mentions` searchable as tokens |
-| R1-53 | Filters | Type, date range, label (notes), status (tasks), archived include/exclude |
-| R1-54 | Ranking | Relevance by default; toggle to date; results grouped by type with counts |
-| R1-55 | Performance | <500 ms p95 at 5000 items; results stream as you type with 300 ms debounce |
-| R1-56 | Navigation | Arrow keys + Enter open result; matched terms highlighted |
+Global search was withdrawn by the product owner on 2026-10-03 (ADR-017). Requirement IDs are retired, never reused.
+
+| ID | Status |
+|----|--------|
+| R1-50 … R1-56 | **Removed.** Overlay, scope, matching, filters, ranking, performance and navigation requirements no longer apply |
+
+Content stays reachable through the sidebar views, the label filter (R1-09), the task views and filters (R1-27), and the meetings filters (R1-35).
 
 ### 6.6 Minimal Pet
 
@@ -172,11 +171,11 @@ Requirement IDs map 1:1 to feature specs (`F1-xx`) in the Implementation Plan.
 
 | ID | Requirement | Acceptance criteria |
 |----|-------------|---------------------|
-| R1-80 | Settings sections | General (auto-start, theme, font size S/M/L), Pet, Shortcuts, Data (export/import/delete, DB location shown read-only), Advanced (log level, rebuild search index, reset settings), About (version, licenses) |
-| R1-81 | Global shortcuts (OS-wide) | New note, New task (quick add popup), Show/hide pet, Open search — all user-rebindable; conflicts detected |
+| R1-80 | Settings sections | General (auto-start, theme, font size S/M/L), Pet, Shortcuts, Data (export/import/delete, DB location shown read-only), Advanced (log level, reset settings), About (version, licenses) |
+| R1-81 | Global shortcuts (OS-wide) | New note, New task (quick add popup), Show/hide pet — all user-rebindable; conflicts detected |
 | R1-82 | In-app shortcuts | See UI/UX Brief §8 keyboard map |
 | R1-83 | Platform conventions | `Ctrl` on Windows ↔ `Cmd` on macOS everywhere |
-| R1-84 | Not in v1 settings | Tracking (Phase 2), notifications (Phase 3), encryption, language — hidden, not disabled-greyed |
+| R1-84 | Not in v1 settings | ~~Tracking (Phase 2)~~ **tracking is now a setting (v1.4, off by default)**; notifications (Phase 3), encryption, language — hidden, not disabled-greyed |
 
 ## 7. Non-Functional Requirements
 
@@ -184,7 +183,7 @@ Authoritative numbers live in `09-performance-budgets.md`. Summary:
 
 | Area | Requirement |
 |------|-------------|
-| Performance | Startup <2 s; CRUD <100 ms; search <500 ms; views <300 ms |
+| Performance | Startup <2 s; CRUD <100 ms; views <300 ms |
 | Resources | Idle CPU <1%; RAM <100 MB summed across processes; ≤1 idle disk write/min |
 | Reliability | No data loss on crash (WAL + immediate commit for user actions); DB integrity check on startup (`PRAGMA quick_check`) |
 | Privacy | The app makes **zero** outbound network requests in Phase 0–1 (verifiable by firewall test) |
@@ -194,30 +193,33 @@ Authoritative numbers live in `09-performance-budgets.md`. Summary:
 
 ## 8. Later Phases — Capability Requirements (Addendum required before build)
 
-| Phase | Must deliver | Key open questions for its PRD addendum |
-|-------|-------------|------------------------------------------|
-| 2 Browser Intelligence | Extensions ×4, native bridge, app + domain time, open tabs with close, privacy radar, dashboard | Store URL or domain only by default? Category taxonomy? Incognito handling (must be excluded) |
-| 3 Pet & Companion | Animations, event reactions (D0 §4.6.1), sleep mode, greeting, hover | Character design; reaction rate-limiting so it's never annoying |
-| 4 Voice & Integrations Foundation | Activation-based voice, JEV provider, intents → note/task/query, MCP client scaffold, OAuth | JEV local vs API (privacy vs accuracy); TTS needed? |
-| 5 Developer Companion | Git watcher, build/CI state, pet reactions, task-from-failure | Which build tools detected; repo discovery UX |
-| 6 MCP Integrations | Gmail, GitHub, Slack, Calendar, Notion read-only, cached locally | Data retention for cached remote data |
-| 7 Character Ecosystem | 18 characters, outfits, seasonal, app-specific reactions | Asset pipeline, download vs bundled |
+Phase numbering is authoritative in `01-build-principles/02-build-order.md` (Amendment A-3) and matches D0 as amended (D0-A2). Order: Browser 2 → Pet 3 → Developer 4 → MCP 5 → Voice 6 → Characters 7.
 
-## 9. Decisions Made in This PRD (approve or reject)
+| Phase | D0 component | Must deliver | Key open questions for its PRD addendum |
+|-------|--------------|-------------|------------------------------------------|
+| 2 Browser Intelligence | §4.7–4.9 | Extensions ×4, native bridge, app + domain time, open tabs with close, privacy radar, dashboard | Store URL or domain only by default? Category taxonomy? Incognito handling (must be excluded) |
+| 3 Pet & Companion | §4.6 (reactive) | Animations, event reactions (D0 §4.6.1), sleep mode, greeting, hover | Character design; reaction rate-limiting so it's never annoying |
+| 4 Developer Companion | §4.13 (local) | Git watcher, local build state, pet reactions, task-from-build-failure; fully offline | Which build tools detected; repo discovery UX |
+| 5 MCP Integrations | §4.12 | MCP client scaffold, OAuth, Gmail, GitHub, Slack, Calendar, Notion read-only, cached locally | Data retention for cached remote data |
+| 5.1 CI Status | §4.13 (CI) | GitHub Actions status (Jenkins if sized), CI pass/fail reactions, CI-failure notification and task suggestion, via Phase 5 GitHub login | Jenkins auth without OAuth; deployment events source |
+| 6 Voice | §4.11 | Activation-based voice, JEV provider, intents → note/task/query, meeting transcription | JEV local vs API (privacy vs accuracy); TTS needed? |
+| 7 Character Ecosystem | §4.14 | 18 characters, outfits, seasonal, app-specific reactions | Asset pipeline, download vs bundled |
 
-These resolve gaps or contradictions in D0. Each is a [Likely]-quality judgment, not a fact.
+## 9. Decisions (🔒 APPROVED 2026-10-03)
+
+These resolve gaps or contradictions in D0. Each was a [Likely]-quality judgment when proposed; all ten were **approved on 2026-10-03** and are now binding. Changes go through PRD amendments (§12), not edits.
 
 | ID | Gap in D0 | Decision | Reason |
 |----|-----------|----------|--------|
 | D-1 | Log is "immutable" yet "view today's log" | Today = live view; snapshot frozen at rollover | Both requirements hold without contradiction |
-| D-2 | Log includes work sessions/browser time, but tracking ships in Phase 2 | Hide activity sections until Phase 2 | Showing empty sections looks broken |
+| D-2 | Log includes work sessions/browser time, but tracking ships in Phase 2 | ~~Hide activity sections until Phase 2~~ Superseded (v1.4): opt-in tracking | Showing empty sections looks broken |
 | D-3 | D0 says "cancel without deletion" but no delete for tasks | Allow delete only from COMPLETED/CANCELLED | Junk/mistaken tasks must be removable; active work can't be lost by accident |
 | D-4 | Can PLANNED go straight to COMPLETED? | Yes | Matches real behavior for small tasks |
 | D-5 | D0 "Rollback: restore from export" but no import feature | Import into empty workspace only | Merge-import is complex; restore is the stated need |
 | D-6 | Settings list "Encryption at rest" while D0 says not v1 | Hidden in v1 | No half features |
 | D-7 | Notes "delete permanently" with no recovery | 5-second undo, no trash | Prevents accidental loss without adding a trash system |
-| D-8 | "Matches partial words" | Prefix matching, not infix | FTS5 prefix indexes meet the budget; infix (trigram) roughly triples index size — revisit if users complain |
-| D-9 | Startup "Dashboard" in D0 §7.1 vs Phase 2 dashboard | Phase 1 home = **Today view**; Dashboard name reserved for Phase 2 analytics | Avoids two screens with one name |
+| D-8 | "Matches partial words" | Prefix matching, not infix | FTS5 prefix indexes meet the budget; infix (trigram) roughly triples index size — revisit if users complain **(moot: search removed, D2-A4)** |
+| D-9 | Startup "Dashboard" in D0 §7.1 vs Phase 2 dashboard | ~~Phase 1 home = Today view; Dashboard reserved for Phase 2~~ **Amended (v1.4): home is "Today overview"**, combining Today and Dashboard | Avoids two screens with one name |
 | D-10 | Auto-update not mentioned | Not in v1 | Would be the only network call; needs its own privacy decision |
 
 ## 10. Risks
@@ -234,7 +236,7 @@ These resolve gaps or contradictions in D0. Each is a [Likely]-quality judgment,
 
 Cut from the bottom first; never cut above the line.
 
-1. ~~Never cut:~~ notes CRUD, tasks + state machine, daily log freeze, search, minimal pet, export/delete
+1. ~~Never cut:~~ notes CRUD, tasks + state machine, daily log freeze, minimal pet, export/delete
 2. ---------------------------------------------------------------
 3. Meeting participant autocomplete (R1-31 autocomplete only)
 4. Daily log compare + Markdown export (R1-44 compare, R1-45)
@@ -245,4 +247,23 @@ Cut from the bottom first; never cut above the line.
 
 ---
 
-**Approval:** Once §9 is approved, this PRD is locked and all changes go through amendments.
+## 12. Amendments
+
+### Amendment D2-A4 (2026-10-03)
+Global search removed (ADR-017, D0-A4). §6.5 and **R1-50 … R1-56 are withdrawn**; R1-07, R1-80, R1-81, the §1 goal, the §4 scope table, the §7 performance row, D-8 (now moot) and the §11 never-cut list are updated to match. R1-09 (label filter), R1-27 (task views) and R1-35 (meeting filters) are unchanged and are now the only discovery mechanisms. Not affected: Phase 2 Browser Tabs filtering.
+
+### Amendment D2-A3 (2026-10-03)
+§8: CI status, CI reactions and CI-failure task suggestion moved out of Phase 4 into **Phase 5.1** (after MCP, before Voice), authenticated via the Phase 5 GitHub login (ADR-016). Phase 4 is offline. No Phase 0–1 requirement changed.
+
+### Amendment D2-A2 (2026-10-03)
+§8 rows reordered and re-scoped to the owner's phase order (ADR-015): Developer 4, MCP 5 (now owns the MCP client scaffold and OAuth), Voice 6. §3 persona P2 now points at Phase 4. No Phase 0–1 requirement changed.
+
+### Amendment D2-A1 (2026-10-03) — locked
+
+- §9 decisions **D-1 … D-10 approved** and marked binding. No decision text changed; only its status.
+- §8 phase table gained a D0-component column and a pointer to `02-build-order.md` as the authority for phase numbering, following D0 Amendment D0-A1. Phase assignments in §8 were already correct and are unchanged.
+- R1-08 gained an explicit acceptance criterion for case-insensitive label uniqueness across the full Unicode range, so Schema Amendment D6-A1 #3 is testable at requirement level.
+- R1-29 now states the history consequence of task deletion (Schema §3.4), so the no-`DELETED`-event decision is visible where the delete rule lives.
+- R1-29 and §6.2.1 wording updated from "deviation"/"interpretation pending" to approved.
+
+**Approval:** §9 is approved and this PRD is locked. All further changes are amendments appended above.

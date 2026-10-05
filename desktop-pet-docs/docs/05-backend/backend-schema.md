@@ -1,8 +1,9 @@
 # Loaf — Backend Schema
 
-**Milestone:** D6 · **Version:** 1.0 · **Date:** 2026-10-02 · **Status:** 🟡 Review
-**Executable source of truth:** [`migrations/001_initial.sql`](migrations/001_initial.sql) — verified against SQLite 3.45 (FTS5, STRICT tables, triggers).
-**Derives from:** PRD (D2), TRD (D3), ADR-005/006/007
+**Milestone:** D6 · **Version:** 1.3 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
+**Executable source of truth:** [`migrations/001_initial.sql`](migrations/001_initial.sql) then [`migrations/002_bin_and_reminders.sql`](migrations/002_bin_and_reminders.sql) — applied against SQLite 3.45.1 inside a runner-owned transaction (STRICT tables, triggers, constraints exercised).
+**Derives from:** PRD (D2), TRD (D3), ADR-005/007
+**Changes:** v1.1, v1.2 and v1.3 — see [§8 Amendments](#8-amendments).
 
 ---
 
@@ -16,16 +17,19 @@
 | Booleans | `INTEGER 0/1` + `CHECK` | SQLite has no bool |
 | Tables | `STRICT` | Type errors fail loudly |
 | Enums | `TEXT` + `CHECK (x IN (...))` | Readable in exports, enforced in DB |
-| Lists | Child tables, never JSON arrays | Searchable, indexable, FK-safe (deviation from D0 §5.1 "text array") |
+| Lists | Child tables, never JSON arrays | Queryable, indexable, FK-safe (deviation from D0 §5.1 "text array") |
 | JSON | Only for `settings`, `user_preferences`, `daily_logs.snapshot` | These are documents, not relations |
 
 **Connection PRAGMAs** (set by Rust on every open): `journal_mode=WAL`, `foreign_keys=ON`, `synchronous=NORMAL`, `busy_timeout=5000`. On startup: `PRAGMA quick_check`; on failure, the app refuses to write and offers restore from the latest `.bak`.
+
+**Transaction ownership:** the migration runner wraps each migration file in one transaction and sets `PRAGMA user_version` itself. Migration files contain no `BEGIN`/`COMMIT` and no `user_version` write — see §5.
 
 ## 2. Entity-Relationship Diagram
 
 ```mermaid
 erDiagram
     notes ||--o{ note_labels : has
+    notes |o--o{ reminders : "linked from"
     labels ||--o{ note_labels : tags
     notes |o--o{ tasks : "linked from"
     tasks ||--o{ task_events : history
@@ -37,13 +41,6 @@ erDiagram
     daily_logs {
         TEXT log_date PK
         TEXT snapshot "immutable JSON"
-    }
-    search_index {
-        TEXT entity_type
-        TEXT entity_id
-        TEXT title
-        TEXT body
-        TEXT extra
     }
 ```
 
@@ -67,8 +64,27 @@ Values are JSON (`true`, `"dark"`, `{"x":1200,"y":800}`). Defaults live in Rust,
 | `color` | enum | `default, red, orange, yellow, green, teal, blue, purple, gray` (8 + default) |
 | `pinned`, `archived` | 0/1 | Archived + pinned allowed; pin ignored while archived |
 | `edited_at` | ms | Changes only when title/body/color/labels change, not on pin/archive |
+| `deleted_at` | ms, NULL | v1.3 (002). Non-NULL = the note is in the Bin; label links are kept. Binned notes are hidden from list, search and label counts; `purge_expired` removes rows older than 30 days. |
 
-Label names are unique **case-insensitively**. Deleting a label cascades only the join rows.
+Label names are unique **case-insensitively across the full Unicode range**, enforced by a unique index on `labels.name_folded`. `name` keeps the user's typed casing for display; `name_folded` is produced by Rust's Unicode lowercasing (`str::to_lowercase`) on every create and rename and is the only uniqueness key.
+
+[Certain] `COLLATE NOCASE` was rejected for this: SQLite's built-in NOCASE collation folds ASCII `A–Z` only, so it treats `WORK`/`work` as duplicates but accepts `ÉCLAIR` alongside `Éclair`. Verified on SQLite 3.45.1 — a `name_folded` index rejects both.
+
+Deleting a label cascades only the join rows.
+
+### 3.2a `reminders` (v1.3, migration 002)
+
+| Column | Notes |
+|--------|-------|
+| `id` | TEXT PK |
+| `title` | TEXT, 1-200 chars |
+| `remind_at` | ms (UTC). Past times are allowed and fire at once |
+| `note_id` | Optional link to a note; `ON DELETE SET NULL` |
+| `fired_at` | Set when `ReminderDue` was published (exactly once); cleared when `remind_at` changes |
+| `done_at` | Set when the person marks it done |
+| `created_at` | ms |
+
+A partial index on `remind_at` (pending = not done, not fired) serves the scheduler's "next one" and "what is due" queries. Search stays plain `LIKE` (ADR-017); no search tables were added.
 
 ### 3.3 `tasks`
 
@@ -86,6 +102,10 @@ Label names are unique **case-insensitively**. Deleting a label cascades only th
 
 The **single source of truth for history**. Every create, status change, defer, and significant edit writes one row in the same transaction as the task change. A trigger blocks `UPDATE`. `local_date` is stored at write time so a later timezone change can't move history to a different day.
 
+`kind` is one of `CREATED`, `STATUS`, `DEFERRED`, `EDITED`.
+
+[Certain] **There is deliberately no `DELETED` kind.** `task_events.task_id` is `ON DELETE CASCADE`, so a row written to record a task's deletion is erased by that same deletion — the event could never be read back. Deletion is instead safe to lose because of two other rules: a task can only be deleted from `COMPLETED` or `CANCELLED` (PRD R1-29), and frozen daily logs copy task titles into their snapshot (§3.7), so a past day still reads correctly after the task is gone. If per-task deletion history is ever needed, it requires a separate non-cascading audit table and its own ADR — not a cascading event row.
+
 Uses:
 - Completion history view (R1-27 Completed)
 - Daily log reconstruction for missed days (R1-43)
@@ -101,7 +121,7 @@ Append-only by product rule; deletion allowed within 5 minutes (enforced in Rust
 
 - Participants/decisions/action items are ordered by `position`.
 - `meeting_action_items.task_id` is unique (one action item → at most one task) and `ON DELETE SET NULL` (deleting the task un-links, item remains).
-- `transcript` exists now (nullable) so Phase 4 needs no migration for it.
+- `transcript` exists now (nullable) so Phase 6 (Voice) needs no migration for it.
 
 ### 3.7 `daily_logs`
 
@@ -136,27 +156,25 @@ Snapshot JSON, `snapshot_version = 1`:
 5. Skip insert if all lists are empty and all counts are zero (R1-43)
 6. `INSERT OR IGNORE` — rollover is idempotent
 
-### 3.8 Search: `search_index` (FTS5) + `search_map`
+### 3.8 Search — ❌ REMOVED (ADR-017)
 
-| Entity | `title` | `body` | `extra` |
-|--------|---------|--------|---------|
-| note | title | body (Markdown source) | label names |
-| task | title | description + work updates | project, priority, status |
-| meeting | title | notes + decisions + action items | participants, assignees |
-| daily_log | "Daily log YYYY-MM-DD" | all task titles in snapshot | — |
+Global search was withdrawn on 2026-10-03. Migration 001 creates no FTS5 table, no `search_map`, and no reindex hooks; repositories write source rows only. Section number kept so references to §3.9+ do not shift.
 
-Tokenizer: `unicode61 remove_diacritics 2 tokenchars '#@'` → case-insensitive, `#work` and `@name` stay single tokens. Prefix indexes `2 3` make `hac*` fast.
+If search is ever reinstated it arrives as migration 00N that creates the index and backfills it in one pass from the source tables, and the discipline from ADR-014 (reindex inside the source transaction, consistency test, rebuild command) returns with it.
 
-**Why app-maintained, not triggers:** indexed text spans parent + child tables (labels, participants, decisions). Triggers on six tables would be fragile. Instead every repository write that changes indexed text calls `search::reindex(entity)` **inside the same transaction**. Guardrails:
-- Integration test: random CRUD sequence → index equals a from-scratch rebuild
-- Settings → Advanced → "Rebuild search index"
-- Startup: if `search_map` row count ≠ entity count, rebuild in background
+### 3.9 `app_sessions`, `domain_sessions`, `domains` (v1.4, migration 003)
 
-**Query shape:** user input is tokenized in Rust; each token becomes `"token"*` (quoted to neutralize FTS syntax); tokens are ANDed; filters (type, date, status, label, archived) applied by joining back to source tables; ranked with `bm25(search_index, 0, 0, 10.0, 4.0, 2.0)` (title weighted highest).
+| Table | Purpose | Columns |
+|-------|---------|---------|
+| `app_sessions` | One stretch in one foreground app | `id`, `app` (display name), `category`, `is_browser`, `started_at`, `ended_at` (>= started_at); index on `started_at` |
+| `domain_sessions` | One stretch on one site, from a browser extension | `id`, `browser`, `domain`, `started_at`, `ended_at`; index on `(domain, started_at)` |
+| `domains` | The user's say per site | `domain` PK, `category` (default `Other`), `tracked` (default 1), `first_seen`, `last_seen` |
 
-## 4. Phase 2 Preview (migration 002 — not created yet)
+Rules: **domain only, never a URL, path or title** (no such column exists; `normalize_host` rejects anything else); a domain with `tracked = 0` is never written and untracking deletes its sessions; incognito is never reported (extension side); sessions under 2 s are dropped and over 12 h are clamped before storing; 400-day retention (purged at startup and on day rollover); categories are Coding, Design, Research, Communication, Notes, Entertainment, Other. All times are ms since the epoch (UTC); the local hour of day is computed with the injected clock's zone at query time. The tables are exported with the rest of the data when export is built. `browser_sessions` and `browser_tabs` from the old preview are not created.
 
-Defined now so Phase 1 doesn't paint us into a corner; created only when Phase 2 starts.
+## 4. Phase 2 Preview — superseded by migration 003 (see §3.9 and Amendment D6-A5)
+
+The original preview, kept as the record. Pulled forward by the owner as `003_usage_tracking.sql` with a smaller, domain-only shape (§3.9).
 
 | Table | Purpose | Key columns |
 |-------|---------|-------------|
@@ -169,8 +187,10 @@ Rules carried forward: writes buffered and flushed ≤1/min (ADR-005); untracked
 
 ## 5. Migration Policy (ADR-007)
 
-- Files: `NNN_description.sql`, embedded in the binary, applied in order inside a transaction
-- Version in `PRAGMA user_version`
+- Files: `NNN_description.sql`, embedded in the binary, applied in order
+- **The runner owns the transaction.** It issues `BEGIN`, executes the file, sets `PRAGMA user_version`, then `COMMIT`. A migration file must contain neither statement: [Certain] a `BEGIN` inside the runner's transaction fails with `cannot start a transaction within a transaction` (verified on SQLite 3.45.1), and a `user_version` written by the file can drift from the runner's bookkeeping.
+- **Lint rule (implemented in F0-04 as `validate_chain`).** Run the migration chain from scratch on a scratch database, each file inside an outer transaction, exactly as the runner does. Reject a file if it errors with "within a transaction" (it opened its own), if the transaction is gone afterwards (`COMMIT`/`END`/`ROLLBACK`), or if `user_version` is non-zero (it wrote the version); also reject version gaps. Executing the file is exact where a text search is not: `CREATE TRIGGER … BEGIN … END;` bodies contain the same keywords, including a bare `END;` line in a multi-line trigger, which the regex originally documented here would have wrongly flagged.
+- Version in `PRAGMA user_version`, set by the runner only
 - Before applying: copy DB to `loaf.db.bak-<from_version>`; keep last 3 backups
 - Forward-only; a broken migration is fixed by a new migration
 - Every migration has a test: build DB at previous version with fixture data → migrate → assert data intact
@@ -183,8 +203,7 @@ Rules carried forward: writes buffered and flushed ≤1/min (ADR-005); untracked
 | Tasks + events + updates | 5,000 tasks, 25,000 events | 6 MB |
 | Meetings | 500 × 4 KB | 2 MB |
 | Daily logs | 365 × 6 KB | 2 MB |
-| FTS index | ~1× source text | 12 MB |
-| **Phase 1 total** | | **~26 MB** [Likely] |
+| **Phase 1 total** | | **~14 MB** [Likely] |
 
 Phase 2 activity data is the real growth risk; its PRD addendum must define retention (e.g., raw tab events 90 days, daily aggregates forever) to stay under the 100 MB target.
 
@@ -208,4 +227,31 @@ Phase 2 activity data is the real growth risk; its PRD addendum must define rete
 }
 ```
 
-The search index is never exported; it is rebuilt after import.
+`labels` rows carry both `name` and `name_folded`; import recomputes `name_folded` from `name` rather than trusting the file, so an export edited by hand cannot smuggle in a duplicate label.
+
+---
+
+## 8. Amendments
+
+### Amendment D6-A1 (2026-10-03) — locked with four corrections
+
+Applied before lock, after a cross-document consistency review. Schema version stays `1`; no product code exists yet, so `001_initial.sql` was corrected in place rather than superseded by a `002`.
+
+| # | Was | Now | Why |
+|---|-----|-----|-----|
+| 1 | `001_initial.sql` wrapped itself in `BEGIN;…COMMIT;` and set `PRAGMA user_version = 1` | Both removed; runner owns the transaction and the version (§1, §5) | [Certain] ADR-007 has the runner open a transaction per migration; the file's own `BEGIN` fails inside it (reproduced on SQLite 3.45.1) |
+| 2 | `task_events.kind` allowed `'DELETED'` | Kind removed from the `CHECK` (§3.4) | [Certain] `task_id` cascades, so the row recording a deletion is destroyed by that deletion — the state was unreachable |
+| 3 | "Label names are unique case-insensitively", enforced by `UNIQUE INDEX … COLLATE NOCASE` | `labels.name_folded` column + unique index; Rust does Unicode lowercasing (§3.2) | [Certain] NOCASE folds ASCII only, so the stated guarantee did not hold for non-ASCII names |
+| 4 | §3.8 rejected triggers while ADR-006 (locked) mandated them | §3.8 cites ADR-014, which supersedes ADR-006 on the sync mechanism | ADR-006 could not be edited silently; a locked decision needs a superseding ADR |
+
+### Amendment D6-A2 (2026-10-03) — comment only
+The `meetings.transcript` comment in `001_initial.sql` and §3.6 now say Phase 6 (Voice), per ADR-015. No column, constraint or schema version changed.
+
+### Amendment D6-A3 (2026-10-03) — search tables removed
+Per ADR-017, `001_initial.sql` no longer creates `search_index` (FTS5) or `search_map`, and §3.8, the ER diagram entry, the FTS size row (Phase 1 total ~26 → ~14 MB [Likely]) and the export note are updated. Schema version stays `1`: no code or user database exists, so the file is edited in place rather than superseded by a `002`. Nothing else in the schema changed; the 3 triggers, `name_folded` and the cascade rules are untouched.
+
+### Amendment D6-A4 (v1.3) — search, Bin and reminders restored by the owner
+Migration `002_bin_and_reminders.sql` adds `notes.deleted_at` (Bin, 30-day retention) and the `reminders` table. Notes search is a plain case-insensitive substring match; ADR-017 (no search tables) is unchanged. Schema version is now `2`; export format gains `reminders` and `notes.deleted_at` when export is built.
+
+### Amendment D6-A5 (v1.4) — usage tracking pulled forward
+Migration `003_usage_tracking.sql` adds `app_sessions`, `domain_sessions` and `domains` (§3.9), opt-in and domain-only per ADR-019. Schema version is now `3`. The settings `tracking.apps` (default false) and `tracking.exclude_apps` (default `[]`) are added; no settings table change.

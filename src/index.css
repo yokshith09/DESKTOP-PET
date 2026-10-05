@@ -1,0 +1,144 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-violet: var(--violet);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", Roboto, sans-serif;
+}
+
+/* Light: clean paper, one restrained copper accent. */
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.985 0.002 270);
+  --foreground: oklch(0.2 0.01 270);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.01 270);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.01 270);
+  --primary: oklch(0.56 0.16 48);
+  --primary-foreground: oklch(0.99 0.005 80);
+  --secondary: oklch(0.96 0.003 270);
+  --secondary-foreground: oklch(0.25 0.01 270);
+  --muted: oklch(0.96 0.003 270);
+  --muted-foreground: oklch(0.5 0.01 270);
+  --accent: oklch(0.95 0.004 270);
+  --accent-foreground: oklch(0.25 0.01 270);
+  --destructive: oklch(0.55 0.2 27);
+  --border: oklch(0.915 0.004 270);
+  --input: oklch(0.89 0.004 270);
+  --ring: oklch(0.56 0.16 48);
+  --success: oklch(0.52 0.13 150);
+  --violet: oklch(0.52 0.18 285);
+  --sidebar: oklch(0.968 0.003 270);
+  /* note tint: lightness/chroma of the fill and of the edge */
+  --nl: 0.975;
+  --nc: 0.016;
+  --nbl: 0.885;
+  --nbc: 0.04;
+}
+
+/* Dark: neutral graphite, the default look. */
+.dark {
+  --background: oklch(0.145 0.004 270);
+  --foreground: oklch(0.96 0.003 270);
+  --card: oklch(0.185 0.005 270);
+  --card-foreground: oklch(0.96 0.003 270);
+  --popover: oklch(0.21 0.006 270);
+  --popover-foreground: oklch(0.96 0.003 270);
+  --primary: oklch(0.76 0.15 62);
+  --primary-foreground: oklch(0.18 0.02 60);
+  --secondary: oklch(0.235 0.006 270);
+  --secondary-foreground: oklch(0.96 0.003 270);
+  --muted: oklch(0.235 0.006 270);
+  --muted-foreground: oklch(0.68 0.01 270);
+  --accent: oklch(0.255 0.007 270);
+  --accent-foreground: oklch(0.96 0.003 270);
+  --destructive: oklch(0.7 0.18 22);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 11%);
+  --ring: oklch(0.76 0.15 62);
+  --success: oklch(0.75 0.14 155);
+  --violet: oklch(0.72 0.14 285);
+  --sidebar: oklch(0.165 0.005 270);
+  --nl: 0.215;
+  --nc: 0.02;
+  --nbl: 0.33;
+  --nbc: 0.045;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    font-size: 13.5px;
+    line-height: 20px;
+    letter-spacing: -0.003em;
+    font-feature-settings: "cv11", "ss01";
+  }
+}
+
+/* Note colours: one hue per name, tinted by the theme's lightness/chroma. */
+[data-note-color] {
+  --nh: 260;
+}
+[data-note-color="red"] { --nh: 22; }
+[data-note-color="orange"] { --nh: 55; }
+[data-note-color="yellow"] { --nh: 95; }
+[data-note-color="green"] { --nh: 150; }
+[data-note-color="teal"] { --nh: 195; }
+[data-note-color="blue"] { --nh: 250; }
+[data-note-color="purple"] { --nh: 310; }
+[data-note-color="gray"] { --nh: 270; --nc: 0.012; --nbc: 0.015; }
+
+.note-tint {
+  background-color: oklch(var(--nl) var(--nc) var(--nh));
+  border-color: oklch(var(--nbl) var(--nbc) var(--nh) / 0.7);
+}
+.note-dot {
+  background: oklch(0.72 0.16 var(--nh));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+.bear-wave { animation: bear-wave 0.9s ease-in-out infinite; }
+@keyframes bear-wave { 50% { transform: rotate(-100deg); } }

@@ -1,6 +1,7 @@
 # Build Order — Phases & Milestones
 
-> **Status: 🔒 LOCKED** — v1.0, 2026-10-02. Changes require a written amendment at the bottom of this file.
+> **Status: 🔒 LOCKED** — v1.0, 2026-10-02 · **amended A-1 … A-5 (2026-10-03)**. Changes require a written amendment at the bottom of this file.
+> This file is the **authority for phase numbering** (see Amendment A-2).
 
 This is the canonical sequence for building Loaf. Each phase is a complete, shippable increment.
 
@@ -46,7 +47,6 @@ This is the canonical sequence for building Loaf. Each phase is a complete, ship
 - Archive system
 - Pin system
 - Color system
-- Full-text search
 - Daily work log (auto-generated)
 - Task system (basic)
 - Meeting notes (basic)
@@ -74,12 +74,7 @@ Create/Edit
 ├── Color picker
 ├── Pin toggle
 ├── Archive toggle
-└── Save/Cancel
-
-Search
-├── Search input
-├── Results list (notes + tasks + meetings)
-└── Filter by type
+└── (no Save/Cancel — autosave; PRD R1-02)
 
 Daily Log
 ├── Today's planned tasks
@@ -97,9 +92,7 @@ Daily Log
 - [ ] Can pin/unpin
 - [ ] Can add/remove labels
 - [ ] Can change color
-- [ ] Can search across notes
 - [ ] Notes survive restart
-- [ ] Full-text search works (<500ms for 5000 items)
 - [ ] Daily log auto-generates and shows correct data
 - [ ] Can create tasks with title, due date, status
 - [ ] Can mark tasks complete
@@ -195,7 +188,7 @@ Privacy Radar
 
 **What's NOT built:**
 - Character customization (Phase 7)
-- Voice (Phase 4)
+- Voice (Phase 6)
 - Advanced animations
 - Sound
 
@@ -217,61 +210,24 @@ Privacy Radar
 
 ---
 
-## Phase 4: Voice & Integrations Foundation
+## Phase 4: Developer Companion
 
-**Goal:** Add voice input and prepare for MCP integrations.
-
-**What's built:**
-- Voice activation (button or wake word)
-- JEV integration (provider layer)
-- Intent parsing (Create task, Create note, Query, etc.)
-- Voice-to-task pipeline
-- Voice-to-note pipeline
-- Voice queries (What did I do today?, Time on app X?)
-- MCP client scaffold
-- OAuth flow for integrations
-- All tests
-
-**What's NOT built:**
-- Meeting transcription (comes later)
-- Individual integrations (Gmail, GitHub, etc.)
-- Automatic voice reactions
-- Always-on microphone
-
-**Acceptance Criteria:**
-- [ ] Can activate voice via button
-- [ ] Voice audio captured and sent to JEV
-- [ ] Intent parsed correctly
-- [ ] Can create task via voice
-- [ ] Can create note via voice
-- [ ] Can query data via voice
-- [ ] Results spoken aloud (text-to-speech)
-- [ ] JEV responses cached/logged locally
-- [ ] MCP client can be instantiated
-- [ ] OAuth flow works
-- [ ] Test coverage >80%
-
-**Ship:** Yes. Voice becomes available for task/note creation.
-
----
-
-## Phase 5: Developer Companion
-
-**Goal:** Add git, build, and CI awareness.
+**Goal:** Add local git and build awareness. Phase 4 is fully local — no network, no credentials. CI status arrives in Phase 5.1.
 
 **What's built:**
 - Git repository watcher
 - Commit detection
-- Build system monitoring
-- CI status checks (GitHub Actions, Jenkins) — a **documented polling exception** with backoff, see 07 ADR-009
+- Local build system monitoring
 - Pet reactions to git/build events
-- Build failure notifications
-- Suggested task creation on build failure
+- Build failure notifications (from the local build)
+- Suggested task creation on local build failure
 - All tests
 
 **What's NOT built:**
+- CI status checks (GitHub Actions, Jenkins) — Phase 5.1
+- CI pass/fail pet reactions and CI-failure notifications — Phase 5.1
+- Deployment events — with CI in Phase 5.1
 - Automatic task creation (requires user confirmation)
-- Advanced CI integration (only GitHub Actions, Jenkins in v1)
 - Code analysis
 - Performance metrics
 
@@ -280,20 +236,22 @@ Privacy Radar
 - [ ] Pet reacts to git push (celebration)
 - [ ] Can detect build start/complete
 - [ ] Pet shows build state (working, success, failure)
-- [ ] Can check CI status
-- [ ] Notifications on CI failure
+- [ ] Notification on local build failure
 - [ ] User can create task from build failure
+- [ ] Zero network requests (firewall test)
 - [ ] Test coverage >80%
 
-**Ship:** Yes. Developers now have workspace awareness + git/CI reactions.
+**Ship:** Yes. Developers now have workspace awareness + git/build reactions.
 
 ---
 
-## Phase 6: MCP Integrations
+## Phase 5: MCP Integrations
 
-**Goal:** Connect to external services (Gmail, GitHub, Slack, Calendar, Notion).
+**Goal:** Build the MCP client and OAuth foundation, then connect to external services (Gmail, GitHub, Slack, Calendar, Notion).
 
 **What's built:**
+- MCP client scaffold
+- OAuth 2.0 + PKCE flow for integrations
 - Gmail integration (read emails, extract action items)
 - GitHub integration (read PRs, issues)
 - Slack integration (read messages, send notifications)
@@ -308,8 +266,12 @@ Privacy Radar
 - Write-back to external services (v1 is read-only)
 - Real-time sync (event-driven only)
 - Advanced filtering
+- CI status (Phase 5.1, built on this phase's GitHub login)
+- Voice (Phase 6)
 
 **Acceptance Criteria:**
+- [ ] MCP client can be instantiated, list tools, call one
+- [ ] OAuth flow works (loopback redirect, PKCE, tokens in keychain)
 - [ ] Can authenticate Gmail via OAuth
 - [ ] Can read recent emails
 - [ ] Can extract action items from emails
@@ -321,6 +283,72 @@ Privacy Radar
 - [ ] Test coverage >80%
 
 **Ship:** Yes. Loaf now connects to the tools developers use daily.
+
+---
+
+## Phase 5.1: CI Status
+
+**Goal:** Show CI results and react to them, now that OAuth and the MCP client exist. Ships after Phase 5 and before Voice; it is an increment, not a renumbering.
+
+**What's built:**
+- CI status checks (GitHub Actions first; Jenkins if it fits the start-of-phase estimate) — a **documented polling exception** with backoff, see 07 ADR-009
+- Authentication through the Phase 5 GitHub OAuth login and keychain-held tokens (ADR-011) — no pasted tokens
+- CI passed / CI failed pet reactions
+- CI failure notifications
+- Suggested task creation on CI failure
+- Deployment started/completed events if the CI provider exposes them
+- All tests
+
+**What's NOT built:**
+- Automatic task creation (requires user confirmation)
+- Providers beyond GitHub Actions and Jenkins
+- Write-back to CI (re-run, cancel)
+
+**Acceptance Criteria:**
+- [ ] Can read CI status for a watched repo through the Phase 5 GitHub login
+- [ ] Polls only while a build is known to be running; exponential backoff 15 s → 5 min; stops when finished (ADR-009)
+- [ ] Pet reacts to CI passed and CI failed
+- [ ] Notification on CI failure
+- [ ] User can create a task from a CI failure
+- [ ] No token in SQLite or in a data export
+- [ ] Test coverage >80%
+
+**Ship:** Yes. Developer Companion is now complete.
+
+---
+
+## Phase 6: Voice
+
+**Goal:** Add activation-based voice input.
+
+**What's built:**
+- Voice activation (button or wake word)
+- JEV integration (provider layer)
+- Intent parsing (Create task, Create note, Query, etc.)
+- Voice-to-task pipeline
+- Voice-to-note pipeline
+- Voice queries (What did I do today?, Time on app X?)
+- Meeting transcription into the existing `meetings.transcript` column
+- All tests
+
+**What's NOT built:**
+- Automatic voice reactions
+- Always-on microphone
+- New integrations (voice reuses the Phase 5 MCP client if a query needs it)
+
+**Acceptance Criteria:**
+- [ ] Can activate voice via button
+- [ ] Voice audio captured and sent to JEV
+- [ ] Intent parsed correctly
+- [ ] Can create task via voice
+- [ ] Can create note via voice
+- [ ] Can query data via voice
+- [ ] Results spoken aloud (text-to-speech)
+- [ ] JEV responses cached/logged locally
+- [ ] No microphone capture outside activation
+- [ ] Test coverage >80%
+
+**Ship:** Yes. Voice becomes available for task/note creation.
 
 ---
 
@@ -368,7 +396,7 @@ Some work happens in parallel:
 | **Design System** | 0–7 | Before UI in each phase |
 | **Testing Infrastructure** | 0–7 | Before code in each phase |
 | **Performance Profiling** | 2–7 | With each feature |
-| **Security Review** | 4+ | Before external integrations |
+| **Security Review** | 4+ | Before external integrations (Phase 5 OAuth/MCP, Phase 5.1 CI polling) |
 
 ---
 
@@ -383,11 +411,13 @@ Phase 2 (Browser) ←───────────────────�
     ↓                                   │   │
 Phase 3 (Pet) ←──────────────────────┐  │   │
     ↓                                │  │   │
-Phase 4 (Voice) ←──────────────────┐ │  │   │
+Phase 4 (Developer) ←──────────────┐ │  │   │
     ↓                              │ │  │   │
-Phase 5 (Developer) ←────────────┐ │ │  │   │
+Phase 5 (MCP) ←──────────────────┐ │ │  │   │
     ↓                            │ │ │  │   │
-Phase 6 (MCP) ←────────────────┐ │ │ │  │   │
+Phase 5.1 (CI status) ←─────────┐ │ │ │  │   │
+    ↓                          │ │ │ │  │   │
+Phase 6 (Voice) ←──────────────┐ │ │ │  │   │
     ↓                          │ │ │ │  │   │
 Phase 7 (Characters) ←────────┐ │ │ │ │  │   │
                               │ │ │ │ │  │   │
@@ -469,3 +499,49 @@ per-phase feature sizing live in the Implementation Plan
 (`docs/06-plan/implementation-plan.md`) and are re-estimated from
 that phase's own feature list immediately before the phase starts.
 Scope and phase order are unchanged.
+
+### Amendment A-2 (2026-10-03)
+**This document is the authority for phase numbering.** *(The phase table in this amendment was superseded by Amendment A-3 below.)* D0 Amendment D0-A1
+resolved a conflict in which `product-document.md` §4.11–§4.14 tagged Voice
+P3, MCP P3–P4, Developer Companion P4 and Characters P5, against the
+numbering used here and in the PRD and Implementation Plan. The numbering in
+this file was correct and is unchanged:
+
+| Phase | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|-------|---|---|---|---|---|---|---|
+| | Notes + minimal pet | Browser Intelligence | Pet & Companion | Voice & Integrations Foundation | Developer Companion | MCP Integrations | Character Ecosystem |
+
+D0 now states **priority** per component (P0/P1/P2/P3) and defers to this
+file for sequence. Any future phase renumbering amends this file first.
+
+### Amendment A-3 (2026-10-03) — phase order set by the product owner
+The product owner set the final order: **Notes → Browser → Pet → Developer → MCP → Voice → Characters.** This supersedes the table in A-2 and the Phase 4–6 bodies above. Phases 0–3 and 7 are unchanged.
+
+| Phase | Was (A-2) | Now |
+|-------|-----------|-----|
+| 4 | Voice & Integrations Foundation | **Developer Companion** |
+| 5 | Developer Companion | **MCP Integrations** (now also owns the MCP client scaffold and OAuth, moved here from old Phase 4) |
+| 6 | MCP Integrations | **Voice** (now voice only; the MCP scaffold and OAuth left it) |
+
+Consequences carried into the same body text and downstream documents:
+- The MCP client scaffold and OAuth flow moved from the old Phase 4 into Phase 5, so Phase 5 is larger than the old Phase 6 and needs re-sizing in its own start-of-phase estimate.
+- Developer Companion now precedes OAuth. Its CI checks use a user-provided access token held in the keychain (ADR-011); OAuth login is Phase 5.
+- ADR-009's polling exceptions are renumbered CI → Phase 4, MCP refresh → Phase 5 (see ADR-015).
+- Meeting transcription (the `meetings.transcript` column) follows Voice to Phase 6.
+- The Phase 7 gate now reads "Phase 6 shipping checklist met".
+
+### Amendment A-4 (2026-10-03) — CI status moves after MCP
+The product owner decided CI is built after MCP integration. Phase numbers 1–7 are unchanged; CI status becomes **Phase 5.1**, shipping after Phase 5 and before Voice.
+
+| | Was (A-3) | Now |
+|---|-----------|-----|
+| Phase 4 Developer Companion | git + build + CI status | **git + local build only**; fully offline |
+| CI status checks, CI reactions, CI-failure task suggestion | Phase 4 | **Phase 5.1** |
+| CI credentials | pasted access token in keychain | **Phase 5 GitHub OAuth** + keychain |
+| ADR-009 CI polling exception | Phase 4 | Phase 5.1 |
+
+Consequences: Phase 4 makes no network requests, so the zero-network firewall test still holds through it; no credential is needed before OAuth exists; the pasted-token UX is dropped. Phase 5.1 depends on Phase 5's GitHub OAuth, so a Phase 5 slip delays CI but nothing else. See ADR-016.
+
+### Amendment A-5 (2026-10-03) — search removed; editor sketch corrected
+- **Search removed (ADR-017).** Phase 1's "Full-text search" build item, the Search UI sketch, and the acceptance lines "Can search across notes" and "Full-text search works (<500ms for 5000 items)" are deleted. Everything else in Phase 1 is unchanged.
+- **Editor sketch corrected.** The Create/Edit sketch ended in "Save/Cancel", contradicting PRD R1-02 and UI brief principle 3 (autosave, no Save buttons). It now says so; the PRD and UI brief governed all along.

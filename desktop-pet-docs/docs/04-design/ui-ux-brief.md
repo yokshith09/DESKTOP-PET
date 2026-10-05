@@ -1,7 +1,8 @@
 # Loaf — UI/UX Design Brief
 
-**Milestone:** D5 · **Version:** 1.0 · **Date:** 2026-10-02 · **Status:** 🟡 Review
-**Derives from:** PRD (D2), App Flow (D4) · **Feeds:** feature specs (`06-feature-definition.md`), frontend implementation
+**Milestone:** D5 · **Version:** 1.2 · **Date:** 2026-10-03 · **Status:** 🔒 LOCKED (approved 2026-10-03)
+**Derives from:** PRD (D2 v1.4), App Flow (D4 v1.2) · **Feeds:** feature specs (`06-feature-definition.md`), frontend implementation
+**Changes in v1.1:** §10 pet table phase label aligned with D0 Amendment D0-A1 (characters = Phase 7); tokens and wireframes unchanged. **v1.2:** search removed (D5-A2) — sidebar box, S-50, component, empty state and two shortcuts. **v1.3:** search, Bin and reminders restored by the owner (backend: migration 002); screens to be amended by the frontend work. **Owner amendment v1.4 (2026-10-04):** Phase-2 app/domain time tracking is pulled forward into the main dashboard as **opt-in (default off, `tracking.apps`), domain-only (no URLs, paths or titles), incognito excluded (extension side), local only, with delete controls** (migration 003, ADR-019). R1-46 and R1-84 are superseded for tracking; D-2 is moot; D-9 is amended: home is **"Today overview"**, combining Today and Dashboard. ADR-017 (no search) is reversed for plain notes search (case-insensitive substring, still no index). Reminders, the Bin (30 days) and calendar events (Phase 5, via MCP) are noted as owner additions. Windows collector first; macOS and the browser extensions follow. The Today overview shows time by app, site and hour with a delete control, and a Settings > Tracking section (on/off, do-not-track apps and sites, delete all).
 
 This brief gives enough direction to build Phase 1 UI without a separate Figma pass. Visual polish (illustration, final pet art) can be iterated without changing structure.
 
@@ -34,7 +35,7 @@ Friendly and quiet — like a warm loaf of bread on the desk. Copy is short, pla
 ┌──────────────┬──────────────────────────────┬─────────────────────────────┐
 │ SIDEBAR 232px│ LIST / VIEW (flex)           │ DETAIL PANEL 420–560px       │
 │              │                              │ (opens on selection)         │
-│ 🔍 Search ⌘K │ View title        [+ New]    │ Title                        │
+│              │ View title        [+ New]    │ Title                        │
 │              │ Filters / tabs               │ Toolbar (pin label color …)  │
 │ Today        │                              │ Body                         │
 │ Tasks        │ Rows / cards                 │                              │
@@ -138,7 +139,6 @@ Font size setting S/M/L scales the root by 0.9 / 1.0 / 1.15.
 | Color picker | 9 swatches with names | Note editor |
 | Tabs | Tasks views, Settings sections | Tasks, Settings |
 | Detail panel | open, full-width (narrow), with Back | All details |
-| Search overlay | empty, typing, results grouped, no results | S-50 |
 | Toast | info, success, error, with Undo action | Global |
 | Modal | confirm, destructive (type-to-confirm) | S-13, S-61, S-62 |
 | Empty state | per view (§7) | All lists |
@@ -177,7 +177,7 @@ Labels: All · work(12) · personal(4) · #hackathon(3)            │ ───
 PINNED                                                          │ Edit | Preview                            │
 ┌────────────┐ ┌────────────┐                                   │ ## Must ship                               │
 │Loaf v1     │ │Shortcuts   │                                   │ - Notes, tasks, meetings                   │
-│scope…      │ │Ctrl+K …    │                                   │ - Daily log                                │
+│scope…      │ │Ctrl+N …    │                                   │ - Daily log                                │
 └────────────┘ └────────────┘                                   │                                            │
 OTHERS                                                          │ work  #loaf  +                             │
 ┌────────────┐ ┌────────────┐ ┌────────────┐                    │ Edited 2 min ago · Created 30 Sep          │
@@ -214,22 +214,6 @@ Action items
 Follow-up  Mon 5 Oct ▾
 ```
 
-### S-50 Search overlay
-```
-┌──────────────────────────────────────────────────────────────┐
-│ 🔍 hackath|                                            Esc   │
-│ Filters: [All ▾] [Any date ▾] [Include archived ☐]           │
-├──────────────────────────────────────────────────────────────┤
-│ NOTES (2)                                                    │
-│ ▸ **Hackath**on ideas — GCP setup, MCP server…        30 Sep │
-│   **Hackath**on retro — what went well…  (Archived)   12 Aug │
-│ TASKS (1)                                                    │
-│   ● Submit **hackath**on form                 Completed 29 Jul│
-│ MEETINGS (1)                                                 │
-│   Hackathon kickoff — @mentors…                     20 Jul │
-└──────────────────────────────────────────────────────────────┘
-```
-
 ### S-41 Daily Log detail
 ```
 ◀  Thursday, 1 Oct 2026                              [Export .md]
@@ -249,11 +233,10 @@ OVERDUE     ! Submit assignment report
 |------|------------------|----------------|
 | Today | "Nothing planned yet. Add the first thing you want to finish today." | Quick add focused |
 | Notes | "Notes you write live here. Press Ctrl+N to start one." | New note |
-| Archive | "Archived notes show up here. They stay searchable." | — |
+| Archive | "Archived notes show up here. Restore one any time." | — |
 | Tasks (any tab) | "No tasks here." + tab-specific hint | Quick add |
 | Meetings | "Log a meeting to keep decisions and turn action items into tasks." | New meeting |
 | Daily Logs | "Your first log appears tomorrow, after today ends." | — |
-| Search, no results | "No matches for "x". Try fewer words or include archived." | Toggle archived |
 
 Loading: skeleton rows only if a load exceeds 150 ms (most won't). Errors: inline under fields; operation failures as error toast with Retry.
 
@@ -265,10 +248,8 @@ Loading: skeleton rows only if a load exceeds 150 ms (most won't). Errors: inlin
 |-------|----------|--------|
 | Global (OS-wide, rebindable) | `Mod+Shift+N` | New note (opens main window) |
 | | `Mod+Shift+T` | Quick-add task popup |
-| | `Mod+Shift+K` | Open Loaf search |
 | | `Mod+Shift+P` | Show/hide pet |
-| App | `Mod+K` | Search overlay |
-| | `Mod+N` | New note |
+| App | `Mod+N` | New note |
 | | `Mod+T` | New task (focus quick add) |
 | | `Mod+M` | New meeting |
 | | `Mod+1…5` | Today · Tasks · Notes · Meetings · Daily Logs |
@@ -295,7 +276,7 @@ Loading: skeleton rows only if a load exceeds 150 ms (most won't). Errors: inlin
 
 | Item | Phase 1 | Phase 3+ |
 |------|---------|----------|
-| Character | One original character. Working concept: **a small round loaf-shaped creature with a tiny face** — fits the name, readable at 48 px, ownable | Animations, reactions, 18 characters (Phase 7) |
+| Character | One original character. Working concept: **a small round loaf-shaped creature with a tiny face** — fits the name, readable at 48 px, ownable | Animations and reactions (Phase 3); 18 characters and outfits (Phase 7) |
 | Asset | Single idle frame PNG/WebP with alpha; master at 512×512, exported at 64 / 96 / 128 px (S/M/L) @1x and @2x | Sprite sheets, ≤3 s per animation, 30 FPS cap |
 | Style | Flat shapes, 2–3 tones, thin outline so it reads on light and dark desktops | Same style system |
 | Behavior | Static. Hover shows a subtle 1 px lift via CSS transform (no loop). Click opens Today | State machine (TRD §5 `pet`) |
@@ -312,3 +293,10 @@ The pet art is the only asset requiring a designer or illustration tool; everyth
 | Modifier | Ctrl | Cmd |
 | Settings shortcut | Ctrl+, | Cmd+, |
 | Title bar | Native (no custom chrome in v1) | Native |
+
+---
+
+## 12. Amendments
+
+### Amendment D5-A2 (2026-10-03) — search removed
+Removed: the sidebar "🔍 Search ⌘K" box (the sidebar now starts at Today), the S-50 Search overlay wireframe, the Search overlay component, the "Search, no results" empty state, and the shortcuts `Mod+K` (in-app) and `Mod+Shift+K` (global). The Archive empty state no longer promises searchability. `Mod+K` and `Mod+Shift+K` stay unassigned. Wireframe numbering keeps S-50 retired so S-41 and later references hold.
