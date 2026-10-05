@@ -116,6 +116,7 @@ pub fn run() {
             ipc::tasks_query,
             ipc::task_quick_add,
             ipc::task_transition,
+            ipc::task_update,
             ipc::daily_log_get,
             ipc::usage_summary,
             ipc::usage_app_sessions,

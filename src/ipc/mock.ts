@@ -304,6 +304,13 @@ export function createMock() {
       const back = Math.round((new Date(today + "T00:00:00").getTime() - d.getTime()) / 86_400_000);
       return back < 0 || back > 20 ? null : sampleLog(String(a.date), back);
     },
+    task_update: (a) => {
+      const x = tasks.find((y) => y.id === a.id) ?? fail("NOT_FOUND", "That task no longer exists.");
+      const e = a.edit as { title: string; priority?: Task["priority"]; planned_date?: string | null; due_date?: string | null };
+      if (!e.title.trim()) fail("VALIDATION", "Give the task a title.");
+      x.title = e.title.trim(); x.priority = e.priority ?? null; x.planned_date = e.planned_date ?? null; x.due_date = e.due_date ?? null; x.updated_at = now();
+      emit("TaskUpdated"); return x;
+    },
     task_transition: (a) => {
       const x = tasks.find((y) => y.id === a.id) ?? fail("NOT_FOUND", "That task no longer exists.");
       x.status = a.to as TaskStatus; x.completed_at = x.status === "COMPLETED" ? now() : null;

@@ -1,7 +1,7 @@
 // Typed IPC client (F0-07): the only place that knows command names and argument shapes.
 import { call } from "./transport";
 import type {
-  UsageSummary, TimeRange, TrackingStatus, BinNote, DailyLog, Reminder, ReminderInput, ReminderPatch, Label, LabelCount, Note, NoteInput, NotePatch, NoteSort, NoteSummary, Task, TaskRow,
+  UsageSummary, TimeRange, TrackingStatus, BinNote, DailyLog, Reminder, ReminderInput, ReminderPatch, Label, LabelCount, Note, NoteInput, NotePatch, NoteSort, NoteSummary, Task, TaskEdit, TaskRow,
   TaskStatus, TaskView,
 } from "./types";
 import type { Settings, SettingsKey } from "./settings";
@@ -49,5 +49,6 @@ export const ipc = {
   trackingStatus: () => call<TrackingStatus>("tracking_status"),
   usageDelete: (from: number | null, to: number | null) => call<unknown>("usage_delete", { from, to }),
   openUrl: (url: string) => call<unknown>("open_url", { url }),
+  taskUpdate: (id: string, edit: TaskEdit) => call<Task>("task_update", { id, edit }),
   taskTransition: (id: string, to: TaskStatus) => call<Task>("task_transition", { id, to }),
 };

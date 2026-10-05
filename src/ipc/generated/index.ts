@@ -24,6 +24,7 @@ export type { JsonValue } from "./serde_json/JsonValue";
 export type { Snapshot } from "./Snapshot";
 export type { Stats } from "./Stats";
 export type { Task } from "./Task";
+export type { TaskEdit } from "./TaskEdit";
 export type { TaskFilters } from "./TaskFilters";
 export type { TaskRow } from "./TaskRow";
 export type { TaskStatus } from "./TaskStatus";

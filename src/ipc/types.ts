@@ -3,7 +3,7 @@ import type { NoteColor, NoteInput as GeneratedNoteInput, NotePatch as Generated
 
 export type {
   AppError, BinNote, DailyLog, ErrorCode, Label, LogEntry, LabelCount, Note, NoteColor, NoteSort, NoteSummary, Priority,
-  Reminder, Snapshot, Stats, Task, TaskRow, TaskStatus, TaskView, AppUsage, DomainUsage, DomainSetting, TimeRange, TrackingStatus, UsageSummary,
+  Reminder, Snapshot, Stats, Task, TaskEdit, TaskRow, TaskStatus, TaskView, AppUsage, DomainUsage, DomainSetting, TimeRange, TrackingStatus, UsageSummary,
 } from "./generated";
 
 export const NOTE_COLORS: readonly NoteColor[] = [

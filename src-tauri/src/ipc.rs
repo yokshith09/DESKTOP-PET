@@ -12,7 +12,7 @@ use loaf_core::notes::{self, BinNote, Note, NoteInput, NotePatch, NoteSort, Note
 use loaf_core::reminders::{self, Reminder, ReminderInput, ReminderPatch};
 use loaf_core::settings::SettingsKey;
 use loaf_core::settings_service::SettingsService;
-use loaf_core::tasks::{self, Task, TaskFilters, TaskRow, TaskStatus, TaskView};
+use loaf_core::tasks::{self, Task, TaskEdit, TaskFilters, TaskRow, TaskStatus, TaskView};
 use loaf_core::usage::{DomainSetting, TimeRange, TrackingStatus, UsageService, UsageSummary};
 use serde_json::Value;
 use tauri::{AppHandle, State};
@@ -214,6 +214,12 @@ pub async fn task_quick_add(title: String, core: State<'_, Core>) -> Result<Task
 #[tauri::command]
 pub async fn task_transition(id: String, to: TaskStatus, core: State<'_, Core>) -> Result<Task> {
     tasks::transition(&core.db, &*core.clock, &id, to).await
+}
+
+/// Edit a task's title, priority, planned day and deadline in one go.
+#[tauri::command]
+pub async fn task_update(id: String, edit: TaskEdit, core: State<'_, Core>) -> Result<Task> {
+    tasks::update(&core.db, &*core.clock, &id, edit.into()).await
 }
 
 // ---- daily logs (the Time screen) -----------------------------------------------------------

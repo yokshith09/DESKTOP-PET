@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Bell, BellRing, CalendarCheck2, Plus, Trash2 } from "lucide-react";
+import { Bell, BellRing, CalendarCheck2, CalendarClock, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { TaskEditor } from "./TaskEditor";
 import { AddReminder } from "@/features/reminders/AddReminder";
 import { useReminderActions, useReminders, useTaskActions, useTodayTasks } from "@/hooks/useLoaf";
 import { formatWhen } from "@/lib/time";
@@ -18,6 +19,7 @@ export const PRIORITY: Record<Priority, { glyph: string; label: string; cls: str
 };
 
 const DAY = 86_400_000;
+const shortDate = (ymd: string) => new Date(`${ymd}T00:00:00`).toLocaleDateString([], { month: "short", day: "numeric" });
 const endOfToday = () => new Date(new Date().setHours(23, 59, 59, 999)).getTime();
 
 /** One "Today" agenda: reminders due by tonight (including missed ones) plus the day's tasks. */
@@ -96,7 +98,15 @@ export function TodayAgenda({ showUpcoming = false }: { showUpcoming?: boolean }
             {tasks.map(({ task, overdue }) => (
               <li key={task.id} className="flex h-9 items-center gap-2.5 rounded-md px-1.5 hover:bg-accent/50">
                 <Checkbox aria-label={`Complete ${task.title}`} checked={false} onCheckedChange={() => void complete(task.id, task.title)} />
-                <span className="min-w-0 flex-1 truncate text-[13px]">{task.title}</span>
+                <TaskEditor task={task}>
+                  <button type="button" title="Edit priority, deadline and reminder" aria-label={`Edit ${task.title}`}
+                    className="min-w-0 flex-1 truncate rounded text-left text-[13px] outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+                    {task.title}
+                  </button>
+                </TaskEditor>
+                {task.due_date && !overdue && (
+                  <span className="flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground" title="Deadline"><CalendarClock className="size-3" />{shortDate(task.due_date)}</span>
+                )}
                 {task.status === "IN_PROGRESS" && <Badge variant="primary">In progress</Badge>}
                 {overdue && <Badge variant="destructive">Overdue</Badge>}
                 {task.priority && (

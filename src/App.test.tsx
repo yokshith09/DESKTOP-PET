@@ -49,6 +49,25 @@ describe("Notes screen (against the in-memory shell)", () => {
     expect(await within(dialog).findByText(/Active from/)).toBeTruthy();
   });
 
+  it("a task can be edited from Today: priority and deadline", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Edit Refactor the tray menu" }));
+    const form = await screen.findByRole("form", { name: "Edit Refactor the tray menu" });
+    await user.click(within(form).getByRole("radio", { name: "High" }));
+    await user.type(within(form).getByLabelText("Deadline"), "2030-05-04");
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+    const row = (await screen.findByRole("button", { name: "Edit Refactor the tray menu" })).closest("li") as HTMLElement;
+    expect(await within(row).findByText(/High/)).toBeTruthy();
+    expect(within(row).getByTitle("Deadline")).toBeTruthy();
+  });
+
+  it("browsers list their sites with time under the browser", async () => {
+    render(<App />);
+    const list = await screen.findByRole("list", { name: "Sites in Google Chrome" });
+    expect(await within(list).findByRole("button", { name: /^github\.com/ })).toBeTruthy();
+  });
+
   it("pasted links become shortcuts", async () => {
     const user = userEvent.setup();
     render(<App />);

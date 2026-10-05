@@ -237,6 +237,30 @@ pub struct TaskPatch {
     pub note_id: Option<Option<String>>,
 }
 
+/// What the Today editor sends: the whole editable state of a task, so a cleared field means
+/// "clear it". Converted to a [`TaskPatch`] that sets every field.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export, optional_fields = nullable))]
+#[serde(default)]
+pub struct TaskEdit {
+    pub title: String,
+    pub priority: Option<Priority>,
+    pub planned_date: Option<NaiveDate>,
+    pub due_date: Option<NaiveDate>,
+}
+
+impl From<TaskEdit> for TaskPatch {
+    fn from(e: TaskEdit) -> Self {
+        Self {
+            title: Some(e.title),
+            priority: Some(e.priority),
+            planned_date: Some(e.planned_date),
+            due_date: Some(e.due_date),
+            ..Self::default()
+        }
+    }
+}
+
 fn clean_title(title: &str) -> Result<String> {
     let title = title.trim();
     match title.chars().count() {
@@ -1336,6 +1360,44 @@ mod tests {
             history(&f.db, &task.id).await.unwrap().last().unwrap().kind,
             "EDITED"
         );
+    }
+
+    #[tokio::test]
+    async fn the_today_editor_sets_and_clears_priority_and_deadline() {
+        let f = setup();
+        let task = create(&f.db, &f.clock, titled("plan")).await.unwrap();
+        f.clock.advance_ms(5);
+        let set = update(
+            &f.db,
+            &f.clock,
+            &task.id,
+            TaskEdit {
+                title: "plan it".into(),
+                priority: Some(Priority::High),
+                due_date: Some(d(2026, 10, 9)),
+                ..Default::default()
+            }
+            .into(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            (set.title.as_str(), set.priority, set.due_date),
+            ("plan it", Some(Priority::High), Some(d(2026, 10, 9)))
+        );
+        let cleared = update(
+            &f.db,
+            &f.clock,
+            &task.id,
+            TaskEdit {
+                title: "plan it".into(),
+                ..Default::default()
+            }
+            .into(),
+        )
+        .await
+        .unwrap();
+        assert_eq!((cleared.priority, cleared.due_date), (None, None));
     }
 
     #[tokio::test]

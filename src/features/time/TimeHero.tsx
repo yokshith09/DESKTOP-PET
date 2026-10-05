@@ -57,7 +57,10 @@ export function TimeHero({ className }: { className?: string }) {
             )}
           </p>
           <div className="mt-5 grid min-h-0 flex-1 gap-5 sm:grid-cols-2">
-            <UsageList label="Apps" empty="No apps yet." items={(usage?.apps ?? []).map((a) => ({ key: a.app, name: a.app, category: a.category, seconds: a.total_seconds, kind: "app" as const }))} onOpen={setDetail} />
+            <UsageList label="Apps" empty="No apps yet." items={(usage?.apps ?? []).map((a) => ({
+              key: a.app, name: a.app, category: a.category, seconds: a.total_seconds, kind: "app" as const,
+              tabs: a.is_browser ? (usage?.domains ?? []).filter((d) => d.browser === a.app).map((d) => ({ key: d.domain, name: d.domain, category: d.category, seconds: d.total_seconds, kind: "domain" as const })) : [],
+            }))} onOpen={setDetail} />
             <UsageList label="Websites" empty="No sites yet. They appear once the Loaf browser extension is connected." items={(usage?.domains ?? []).map((d) => ({ key: d.domain, name: d.domain, category: d.category, seconds: d.total_seconds, kind: "domain" as const }))} onOpen={setDetail} />
           </div>
           <div className="mt-4 shrink-0 border-t pt-3">
@@ -70,7 +73,7 @@ export function TimeHero({ className }: { className?: string }) {
   );
 }
 
-interface Item { key: string; name: string; category: string; seconds: number; kind: "app" | "domain" }
+interface Item { key: string; name: string; category: string; seconds: number; kind: "app" | "domain"; /** Sites seen in this browser, with their time. */ tabs?: Item[] }
 
 /** Every app or site with its time, longest first; click for the active spans. */
 function UsageList({ label, items, empty, onOpen }: { label: string; items: Item[]; empty: string; onOpen: (d: Detail) => void }) {
@@ -84,21 +87,32 @@ function UsageList({ label, items, empty, onOpen }: { label: string; items: Item
         <ul className="-mx-1 min-h-0 flex-1 overflow-y-auto">
           {items.map((it) => (
             <li key={it.key}>
-              <button type="button" onClick={() => onOpen({ kind: it.kind, name: it.name, category: it.category })}
-                aria-label={`${it.name}, ${formatDuration(it.seconds)}. Show when you were active`}
-                className="block w-full rounded-md px-1 py-1.5 text-left outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring">
-                <span className="flex items-baseline gap-2">
-                  <span className="truncate text-[13px]">{it.name}</span>
-                  <span className="ml-auto text-[12px] font-medium tabular-nums">{formatDuration(it.seconds)}</span>
-                </span>
-                <span className="mt-1 block h-1 overflow-hidden rounded-full bg-muted">
-                  <span className={cn("block h-full rounded-full", categoryStyle(it.category).bar)} style={{ width: `${Math.max(2, (it.seconds / Math.max(1, max)) * 100)}%` }} />
-                </span>
-              </button>
+              <Row it={it} max={max} onOpen={onOpen} />
+              {it.tabs && it.tabs.length > 0 && (
+                <ul aria-label={`Sites in ${it.name}`} className="mb-1 ml-2 border-l pl-2">
+                  {it.tabs.map((t) => <Row key={t.key} it={t} max={it.seconds} onOpen={onOpen} small />)}
+                </ul>
+              )}
             </li>
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+function Row({ it, max, onOpen, small }: { it: Item; max: number; onOpen: (d: Detail) => void; small?: boolean }) {
+  return (
+    <button type="button" onClick={() => onOpen({ kind: it.kind, name: it.name, category: it.category })}
+      aria-label={`${it.name}, ${formatDuration(it.seconds)}. Show when you were active`}
+      className="block w-full rounded-md px-1 py-1.5 text-left outline-none hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring">
+      <span className="flex items-baseline gap-2">
+        <span className={cn("truncate", small ? "text-xs text-muted-foreground" : "text-[13px]")}>{it.name}</span>
+        <span className={cn("ml-auto font-medium tabular-nums", small ? "text-[11px]" : "text-[12px]")}>{formatDuration(it.seconds)}</span>
+      </span>
+      <span className="mt-1 block h-1 overflow-hidden rounded-full bg-muted">
+        <span className={cn("block h-full rounded-full", categoryStyle(it.category).bar)} style={{ width: `${Math.max(2, (it.seconds / Math.max(1, max)) * 100)}%` }} />
+      </span>
+    </button>
   );
 }

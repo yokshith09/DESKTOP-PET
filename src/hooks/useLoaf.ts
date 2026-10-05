@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { daysAgo, ymd } from "@/lib/dates";
-import { errorMessage, ipc, onEvent, type NoteInput, type NotePatch, type NoteSort, type TaskStatus } from "@/ipc";
+import { errorMessage, ipc, onEvent, type NoteInput, type NotePatch, type NoteSort, type TaskEdit, type TaskStatus } from "@/ipc";
 
 export const keys = {
   notes: (archived: boolean, labelId: string | null, sort: NoteSort) => ["notes", archived, labelId, sort] as const,
@@ -114,7 +114,9 @@ export function useNoteActions() {
 export function useTaskActions() {
   const quickAdd = useAction((title: string) => ipc.taskQuickAdd(title), [["tasks"]]);
   const move = useAction((id: string, to: TaskStatus) => ipc.taskTransition(id, to), [["tasks"]]);
+  const update = useAction((id: string, edit: TaskEdit) => ipc.taskUpdate(id, edit), [["tasks"]]);
   return {
+    update: (id: string, edit: TaskEdit) => update.mutateAsync([id, edit]),
     quickAdd: (title: string) => quickAdd.mutateAsync([title]),
     setDone: (id: string, done: boolean) => move.mutateAsync([id, done ? "COMPLETED" : "PLANNED"]),
   };
