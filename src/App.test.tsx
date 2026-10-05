@@ -68,6 +68,13 @@ describe("Notes screen (against the in-memory shell)", () => {
     expect(await within(list).findByRole("button", { name: /^github\.com/ })).toBeTruthy();
   });
 
+  it("every overview tile has a move handle", async () => {
+    render(<App />);
+    for (const t of ["Today", "Total time today", "Links", "Activity", "Done this week"]) {
+      expect(await screen.findByRole("button", { name: `Move ${t}` })).toBeTruthy();
+    }
+  });
+
   it("pasted links become shortcuts", async () => {
     const user = userEvent.setup();
     render(<App />);
